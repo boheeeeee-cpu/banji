@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -8,7 +8,20 @@ import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/brand';
 import { Colors, Spacing } from '@/constants/theme';
 import { PLACE_TYPE_LABELS, type Place } from '@/data/places';
+import { searchNaverLocal, type NaverLocalResult } from '@/lib/naver-search';
 import { useTripStore } from '@/store/trip-store';
+
+type ParkingResult = NaverLocalResult & { distanceKm: number; isFree: boolean };
+
+const FREE_KEYWORDS = ['무료', '학동', '해금강', '구조라', '조선해양', '김영삼', '칠천량', '맹종죽', '스포츠파크', '대금산', '국립공원'];
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
 
 type Props = {
   place: Place | null;
@@ -18,11 +31,45 @@ type Props = {
 
 export function PlaceDetailSheet({ place, visible, onClose }: Props) {
   const [showItineraryChoice, setShowItineraryChoice] = useState(false);
-  const { toGoIds, myDaysIds, addToGo, addToMyDays, startNewItinerary } = useTripStore();
+  const [parkingList, setParkingList] = useState<ParkingResult[]>([]);
+  const [parkingLoading, setParkingLoading] = useState(false);
+  const [addedParkingTitles, setAddedParkingTitles] = useState<Set<string>>(new Set());
+  const parkingCache = useRef<Record<string, ParkingResult[]>>({});
+
+  const { toGoIds, myDaysIds, addToGo, addToMyDays, startNewItinerary, addCustomPlace } = useTripStore();
   const scheme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const sheetBg = Colors[scheme].background;
   const handleColor = scheme === 'dark' ? '#555' : '#DDD';
   const router = useRouter();
+
+  useEffect(() => {
+    if (!visible || !place) return;
+
+    const cacheKey = place.id;
+    if (parkingCache.current[cacheKey]) {
+      setParkingList(parkingCache.current[cacheKey]);
+      return;
+    }
+
+    setParkingLoading(true);
+    const query = `거제 ${place.area} 공영주차장`;
+    searchNaverLocal(query, 10)
+      .then(results => {
+        const withDist = results
+          .filter(r => r.lat !== 0 && r.lng !== 0)
+          .map(r => ({
+            ...r,
+            distanceKm: haversineKm(place.lat, place.lng, r.lat, r.lng),
+            isFree: FREE_KEYWORDS.some(kw => r.title.includes(kw)),
+          }))
+          .sort((a, b) => a.distanceKm - b.distanceKm)
+          .slice(0, 3);
+        parkingCache.current[cacheKey] = withDist;
+        setParkingList(withDist);
+      })
+      .catch(() => setParkingList([]))
+      .finally(() => setParkingLoading(false));
+  }, [visible, place?.id]);
 
   if (!place) return null;
 
@@ -41,6 +88,7 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
 
   const handleClose = () => {
     setShowItineraryChoice(false);
+    setAddedParkingTitles(new Set());
     onClose();
   };
 
@@ -64,6 +112,17 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
     startNewItinerary([place.id]);
     handleClose();
     router.navigate('/my-days' as any);
+  };
+
+  const handleAddParking = (parking: ParkingResult) => {
+    const id = addCustomPlace({
+      name: parking.title,
+      address: parking.roadAddress || parking.address,
+      lat: parking.lat,
+      lng: parking.lng,
+    });
+    addToMyDays([id]);
+    setAddedParkingTitles(prev => new Set([...prev, parking.title]));
   };
 
   return (
@@ -157,7 +216,6 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
 
             <ThemedText type="small">{place.petNote}</ThemedText>
 
-            {/* 체중 제한 */}
             {place.weightLimitKg && (
               <View style={[styles.infoRow, { marginTop: 6 }]}>
                 <ThemedText style={styles.infoIcon}>⚖️</ThemedText>
@@ -186,6 +244,45 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
               </View>
             </ThemedView>
           )}
+
+          {/* 근처 공영주차장 */}
+          <ThemedView type="backgroundElement" style={styles.infoBlock}>
+            <ThemedText type="smallBold" style={styles.sectionLabel}>🏛️ 근처 공영주차장</ThemedText>
+            {parkingLoading ? (
+              <ThemedText type="small" themeColor="textSecondary">검색 중…</ThemedText>
+            ) : parkingList.length === 0 ? (
+              <ThemedText type="small" themeColor="textSecondary">주변 공영주차장 정보가 없습니다</ThemedText>
+            ) : (
+              parkingList.map((p, i) => {
+                const added = addedParkingTitles.has(p.title);
+                const distLabel = p.distanceKm < 1
+                  ? `${Math.round(p.distanceKm * 1000)}m`
+                  : `${p.distanceKm.toFixed(1)}km`;
+                return (
+                  <View key={i} style={[styles.parkingRow, i === 0 && styles.parkingRowFirst]}>
+                    <View style={styles.parkingInfo}>
+                      <View style={styles.parkingNameRow}>
+                        <ThemedText type="small" style={styles.parkingName} numberOfLines={1}>{p.title}</ThemedText>
+                        <View style={[styles.parkingBadge, p.isFree ? styles.freeBadge : styles.paidBadge]}>
+                          <ThemedText style={[styles.parkingBadgeText, p.isFree ? styles.freeText : styles.paidText]}>
+                            {p.isFree ? '무료' : '유료'}
+                          </ThemedText>
+                        </View>
+                      </View>
+                      <ThemedText type="small" themeColor="textSecondary">{distLabel}</ThemedText>
+                    </View>
+                    <Pressable
+                      onPress={() => { if (!added) handleAddParking(p); }}
+                      style={[styles.parkingAddBtn, added && styles.parkingAddBtnDone]}>
+                      <ThemedText style={[styles.parkingAddBtnText, added && styles.parkingAddBtnTextDone]}>
+                        {added ? '✓ 추가됨' : '+ 일정 추가'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                );
+              })
+            )}
+          </ThemedView>
 
           {/* 네이버 지도 */}
           <Pressable onPress={openNaverMap} style={styles.naverBtn}>
@@ -304,6 +401,36 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   petBadgeText: { fontSize: 12, color: Brand.primary, fontWeight: '600' },
+
+  /* 공영주차장 */
+  parkingRowFirst: { borderTopWidth: 0 },
+  parkingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#CCC4',
+  },
+  parkingInfo: { flex: 1, gap: 3 },
+  parkingNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  parkingName: { flex: 1, fontWeight: '600' },
+  parkingBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 0 },
+  freeBadge: { backgroundColor: '#DCFCE7' },
+  paidBadge: { backgroundColor: '#FEF3C7' },
+  parkingBadgeText: { fontSize: 10, fontWeight: '700' },
+  freeText: { color: '#16A34A' },
+  paidText: { color: '#B45309' },
+  parkingAddBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: Brand.primary,
+    flexShrink: 0,
+  },
+  parkingAddBtnDone: { backgroundColor: '#E5E7EB' },
+  parkingAddBtnText: { fontSize: 11, fontWeight: '700', color: '#FFF' },
+  parkingAddBtnTextDone: { color: '#9CA3AF' },
 
   naverBtn: { alignItems: 'center', paddingVertical: Spacing.two },
   naverBtnText: { color: Brand.primary, fontWeight: '600', fontSize: 14 },
