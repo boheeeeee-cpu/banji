@@ -297,9 +297,7 @@ export default function MyDaysPanel() {
                   <View style={styles.nameRow}>
                     <ThemedText type="smallBold" numberOfLines={1} style={styles.nameText}>{entry.name}</ThemedText>
                     {entry.type === 'curated' && (
-                      <View style={styles.banjiBadge}>
-                        <ThemedText style={styles.banjiText}>반지</ThemedText>
-                      </View>
+                      <ThemedText style={styles.petEmoji}>🐶</ThemedText>
                     )}
                   </View>
                   {entry.type === 'curated' ? (
@@ -471,8 +469,7 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nameText: { flexShrink: 1 },
-  banjiBadge: { backgroundColor: Brand.primary + '25', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  banjiText: { fontSize: 10, color: Brand.primary, fontWeight: '700' },
+  petEmoji: { fontSize: 14 },
   controls: { alignItems: 'center', gap: 2 },
   moveBtn: { padding: 2 },
   moveBtnDisabled: { opacity: 0.2 },

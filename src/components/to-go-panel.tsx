@@ -77,9 +77,7 @@ export default function ToGoPanel() {
               <View style={styles.info}>
                 <View style={styles.nameRow}>
                   <ThemedText type="smallBold" numberOfLines={1} style={styles.nameText}>{place.name}</ThemedText>
-                  <View style={styles.banjiBadge}>
-                    <ThemedText style={styles.banjiText}>반지</ThemedText>
-                  </View>
+                  <ThemedText style={styles.petEmoji}>🐶</ThemedText>
                 </View>
                 <ThemedText type="small" themeColor="textSecondary">
                   {PLACE_TYPE_LABELS[place.placeTypes[0]]} · {place.area}
@@ -162,8 +160,7 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nameText: { flexShrink: 1 },
-  banjiBadge: { backgroundColor: Brand.primary + '25', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 },
-  banjiText: { fontSize: 10, color: Brand.primary, fontWeight: '700' },
+  petEmoji: { fontSize: 14 },
   customIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: Brand.primary + '20', alignItems: 'center', justifyContent: 'center' },
   customIconText: { fontSize: 20 },
   removeBtn: { padding: Spacing.one },
