@@ -42,8 +42,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build:web": "expo export --platform web && cp vercel.json dist/vercel.json",
-    "deploy": "npm run build:web && cd dist && npx vercel --prod --yes"
+    "build:web": "expo export --platform web && cp dist-vercel.json dist/vercel.json && cp -r api dist/api",
+    "deploy": "npm run build:web && npx vercel --prod --yes"
   },
   "private": true
 }
