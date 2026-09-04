@@ -20,7 +20,7 @@ function stripHtml(str: string): string {
 function getUrl(query: string, display: number): string {
   const params = new URLSearchParams({ query, display: String(display), sort: 'random' });
   if (Platform.OS === 'web') {
-    return `http://localhost:3001/local?${params}`;
+    return `/api/local?${params}`;
   }
   return `https://openapi.naver.com/v1/search/local.json?${params}`;
 }
