@@ -379,25 +379,34 @@ export default function MyDaysPanel() {
               onClose={() => setDetailPlace(null)}
             />
           </View>
-          <Pressable
-            style={[styles.naverNavBtn, { backgroundColor: '#03C75A' }]}
-            onPress={() => {
-              const geoEntries = routeEntries;
-              const points: { lat: number; lng: number; name: string }[] = [];
-              if (departureLocation) {
-                points.push({ lat: departureLocation.lat, lng: departureLocation.lng, name: departureLocation.label });
-              }
-              points.push(...geoEntries.map(e => ({ lat: e.lat!, lng: e.lng!, name: e.name })));
-              const url = buildNaverMapUrl(points);
-              if (!url) return;
-              if (Platform.OS === 'web') {
-                window.open(url, '_blank');
-              } else {
-                Linking.openURL(url);
-              }
-            }}>
-            <ThemedText style={styles.naverNavBtnText}>네이버 지도 앱으로 내비게이션</ThemedText>
-          </Pressable>
+          {(() => {
+            const pts: { lat: number; lng: number; name: string }[] = [];
+            if (departureLocation) pts.push({ lat: departureLocation.lat, lng: departureLocation.lng, name: departureLocation.label });
+            pts.push(...routeEntries.map(e => ({ lat: e.lat!, lng: e.lng!, name: e.name })));
+            if (pts.length < 2) return null;
+            return (
+              <View style={styles.navSegmentContainer}>
+                {pts.slice(0, -1).map((from, i) => {
+                  const to = pts[i + 1];
+                  const url = buildNaverMapUrl([from, to]);
+                  return (
+                    <Pressable
+                      key={i}
+                      style={[styles.navSegmentBtn, { backgroundColor: '#03C75A' }]}
+                      onPress={() => {
+                        if (!url) return;
+                        if (Platform.OS === 'web') window.open(url, '_blank');
+                        else Linking.openURL(url);
+                      }}>
+                      <ThemedText style={styles.navSegmentBtnText} numberOfLines={1}>
+                        🧭 {i + 1}번 → {i + 2}번 · {from.name} → {to.name}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -482,16 +491,16 @@ const styles = StyleSheet.create({
   mapButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   saveButton: { backgroundColor: 'rgba(0,0,0,0.12)', borderRadius: Spacing.three, paddingVertical: Spacing.three, paddingHorizontal: Spacing.three, alignItems: 'center', justifyContent: 'center' },
   saveButtonText: { fontWeight: '700', fontSize: 14 },
-  naverNavBtn: {
-    margin: Spacing.three,
-    height: 52,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+  navSegmentContainer: {
+    padding: Spacing.three,
     gap: Spacing.two,
   },
-  naverNavBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  navSegmentBtn: {
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: Spacing.three,
+  },
+  navSegmentBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   mapModal: { flex: 1 },
   mapModalHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
