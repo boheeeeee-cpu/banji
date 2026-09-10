@@ -48,12 +48,11 @@ function buildNaverMapUrl(
   const via = points.slice(1, -1).slice(0, 5);
 
   if (Platform.OS === 'web') {
-    // 웹: 네이버 지도 웹 경유지 경로 URL
-    const startSeg = `${start.lng},${start.lat},${encodeURIComponent(start.name)},,`;
-    const destSeg = `${dest.lng},${dest.lat},${encodeURIComponent(dest.name)},,`;
-    const viaSeg = via.map(v => `${v.lng},${v.lat},${encodeURIComponent(v.name)},,`).join('/');
+    const seg = (p: { lng: number; lat: number; name: string }) =>
+      `${p.lng},${p.lat},${encodeURIComponent(p.name)}`;
+    const viaSeg = via.map(seg).join('/');
     const middle = viaSeg ? `${viaSeg}/` : '';
-    return `https://map.naver.com/p/directions/${startSeg}/${middle}${destSeg}/car/summary`;
+    return `https://map.naver.com/p/directions/${seg(start)}/${middle}${seg(dest)}/car/summary`;
   }
 
   // 네이티브: nmap 딥링크
