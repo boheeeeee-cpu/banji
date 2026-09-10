@@ -106,6 +106,7 @@ export default function MyDaysPanel() {
 
   const [legDurations, setLegDurations] = useState<(number | null)[]>([]);
   const [locLoading, setLocLoading] = useState(false);
+  const [locFailed, setLocFailed] = useState(false);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [itineraryName, setItineraryName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -170,18 +171,25 @@ export default function MyDaysPanel() {
     return legIdx >= 0 ? (legDurations[legIdx] ?? null) : null;
   };
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) return;
+  const requestLocation = () => {
+    if (!navigator.geolocation) { setLocFailed(true); return; }
     setLocLoading(true);
+    setLocFailed(false);
     navigator.geolocation.getCurrentPosition(
       pos => {
         setDepartureLocation({ label: '현재 위치', lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocLoading(false);
       },
-      () => setLocLoading(false),
+      () => { setLocLoading(false); setLocFailed(true); },
       { timeout: 8000 },
     );
   };
+
+  // 패널 열리면 자동으로 현재 위치 설정
+  useEffect(() => {
+    if (!departureLocation) requestLocation();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const adjustDwell = (id: string, delta: number) => {
     const cur = dwellMinutes[id] ?? DEFAULT_DWELL;
@@ -240,10 +248,12 @@ export default function MyDaysPanel() {
                   <ThemedText type="small" themeColor="textSecondary"> ✕</ThemedText>
                 </Pressable>
               </View>
+            ) : locLoading ? (
+              <ThemedText type="small" themeColor="textSecondary">위치 확인 중...</ThemedText>
             ) : (
-              <Pressable onPress={handleGetLocation} style={[styles.locBtn, locLoading && styles.locBtnDisabled]}>
-                <ThemedText type="small" style={styles.locBtnText}>
-                  {locLoading ? '위치 확인 중...' : '현재 위치 사용'}
+              <Pressable onPress={requestLocation} hitSlop={8}>
+                <ThemedText type="small" style={{ color: locFailed ? '#FF6B6B' : Brand.primary, fontWeight: '600' }}>
+                  {locFailed ? '위치 재시도' : '현재 위치 확인'}
                 </ThemedText>
               </Pressable>
             )}
@@ -406,6 +416,10 @@ export default function MyDaysPanel() {
                 {pts.slice(0, -1).map((from, i) => {
                   const to = pts[i + 1];
                   const urls = buildNavUrls([from, to]);
+                  // with departure: pts[0]=현재위치, pts[1]=1번, pts[2]=2번...
+                  // without: pts[0]=1번, pts[1]=2번...
+                  const fromLabel = departureLocation && i === 0 ? '현재위치' : `${departureLocation ? i : i + 1}번`;
+                  const toLabel = `${departureLocation ? i + 1 : i + 2}번`;
                   return (
                     <Pressable
                       key={i}
@@ -415,7 +429,7 @@ export default function MyDaysPanel() {
                         openNavigation(urls);
                       }}>
                       <ThemedText style={styles.navSegmentBtnText} numberOfLines={1}>
-                        🧭 {i + 1}번 → {i + 2}번 · {from.name} → {to.name}
+                        🧭 {fromLabel} → {toLabel} · {from.name} → {to.name}
                       </ThemedText>
                     </Pressable>
                   );
@@ -467,9 +481,6 @@ const styles = StyleSheet.create({
   departureRight: { flex: 1, alignItems: 'flex-end' },
   locRow: { flexDirection: 'row', alignItems: 'center' },
   locText: { maxWidth: 160, fontWeight: '600', color: Brand.primary },
-  locBtn: { backgroundColor: Brand.primary, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one, borderRadius: Spacing.two },
-  locBtnDisabled: { opacity: 0.5 },
-  locBtnText: { color: '#FFF', fontWeight: '600' },
   timeInput: { fontSize: 14, fontWeight: '600', color: Brand.primary, minWidth: 60, textAlign: 'right' },
   list: { paddingHorizontal: Spacing.four, paddingTop: Spacing.one },
   departureItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.two },
