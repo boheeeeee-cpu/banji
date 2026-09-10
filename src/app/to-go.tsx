@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlacePhoto } from '@/components/place-photo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/brand';
-import { BottomTabInset, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import { PLACE_TYPE_LABELS, RECOMMENDED_PLACES } from '@/data/places';
 import { useTripStore } from '@/store/trip-store';
 
 export default function ToGoScreen() {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { toGoIds, myDaysIds, removeFromToGo, addToMyDays, customPlaces, removeCustomPlace } = useTripStore();
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const { toGoIds, myDaysIds, removeFromToGo, addToMyDays, startNewItinerary, customPlaces, removeCustomPlace } = useTripStore();
   const insets = useSafeAreaInsets();
 
   const toGoPlaces = RECOMMENDED_PLACES.filter(p => toGoIds.includes(p.id));
@@ -26,8 +29,24 @@ export default function ToGoScreen() {
   };
 
   const handleAddToMyDays = () => {
+    if (myDaysIds.length > 0) {
+      setAddModalVisible(true);
+    } else {
+      addToMyDays(selectedIds);
+      setSelectedIds([]);
+    }
+  };
+
+  const handleAddToCurrent = () => {
     addToMyDays(selectedIds);
     setSelectedIds([]);
+    setAddModalVisible(false);
+  };
+
+  const handleStartNew = () => {
+    startNewItinerary(selectedIds);
+    setSelectedIds([]);
+    setAddModalVisible(false);
   };
 
   if (isEmpty) {
@@ -167,6 +186,23 @@ export default function ToGoScreen() {
           </Pressable>
         </View>
       )}
+
+      <Modal visible={addModalVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setAddModalVisible(false)}>
+          <Pressable style={[styles.modalBox, { backgroundColor: colors.background }]} onPress={() => {}}>
+            <ThemedText style={styles.modalTitle}>어떻게 추가할까요?</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.modalDesc}>
+              지금 작업 중인 일정이 있어요
+            </ThemedText>
+            <Pressable style={[styles.modalBtn, { backgroundColor: Brand.primary }]} onPress={handleAddToCurrent}>
+              <ThemedText style={styles.modalBtnText}>현재 일정에 추가</ThemedText>
+            </Pressable>
+            <Pressable style={[styles.modalBtn, { backgroundColor: colors.backgroundElement }]} onPress={handleStartNew}>
+              <ThemedText style={styles.modalBtnTextAlt}>새 일정으로 시작</ThemedText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ThemedView>
   );
 }
@@ -228,6 +264,13 @@ const styles = StyleSheet.create({
     left: Spacing.four,
     right: Spacing.four,
   },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: { width: 300, borderRadius: 20, padding: Spacing.four, gap: Spacing.two },
+  modalTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  modalDesc: { textAlign: 'center', marginBottom: Spacing.one },
+  modalBtn: { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  modalBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
+  modalBtnTextAlt: { fontWeight: '600', fontSize: 15 },
   addButton: {
     backgroundColor: Brand.primary,
     borderRadius: Spacing.three,
