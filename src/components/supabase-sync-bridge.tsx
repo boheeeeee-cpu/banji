@@ -8,7 +8,7 @@ export default function SupabaseSyncBridge() {
   const {
     toGoIds, myDaysIds, customPlaces, dwellMinutes,
     departureLocation, departureTime,
-    loadFromSupabase,
+    loadFromSupabase, getUserActionVersion,
   } = useTripStore();
 
   const loadedRef = useRef(false);
@@ -24,6 +24,11 @@ export default function SupabaseSyncBridge() {
     }
 
     syncingRef.current = true;
+    // Snapshot the user action counter before the async request.
+    // If the user makes any store changes while waiting for Supabase,
+    // the counter will have incremented and we skip the overwrite.
+    const actionVersionAtStart = getUserActionVersion();
+
     supabase
       .from('user_trips')
       .select('*')
@@ -31,15 +36,18 @@ export default function SupabaseSyncBridge() {
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
-          // 서버에 데이터 있으면 서버 데이터로 덮어씀
-          loadFromSupabase({
-            toGoIds: data.to_go_ids ?? [],
-            myDaysIds: data.my_days_ids ?? [],
-            customPlaces: data.custom_places ?? [],
-            dwellMinutes: data.dwell_minutes ?? {},
-            departureLocation: data.departure_location ?? null,
-            departureTime: data.departure_time ?? '09:00',
-          });
+          if (getUserActionVersion() === actionVersionAtStart) {
+            // No user actions happened during the request — safe to load
+            loadFromSupabase({
+              toGoIds: data.to_go_ids ?? [],
+              myDaysIds: data.my_days_ids ?? [],
+              customPlaces: data.custom_places ?? [],
+              dwellMinutes: data.dwell_minutes ?? {},
+              departureLocation: data.departure_location ?? null,
+              departureTime: data.departure_time ?? '09:00',
+            });
+          }
+          // If version changed, user already modified state — keep their changes
         }
         // 서버에 데이터 없으면 (첫 로그인) 현재 로컬 데이터를 그대로 유지
         // → 이후 auto-save가 로컬 데이터를 서버에 올려줌

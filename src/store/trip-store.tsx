@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 
 export type DepartureLocation = {
   label: string;
@@ -61,6 +61,7 @@ type TripStore = {
     savedItineraries?: SavedItinerary[];
   }) => void;
   clearAll: () => void;
+  getUserActionVersion: () => number;
 };
 
 const TripContext = createContext<TripStore | null>(null);
@@ -74,12 +75,18 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   const [dwellMinutes, setDwellMinutesState] = useState<Record<string, number>>({});
   const [customPlaces, setCustomPlaces] = useState<CustomPlace[]>([]);
   const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
+  // Synchronous counter incremented on every user-initiated state change.
+  // SupabaseSyncBridge reads this in async .then() to detect if the user
+  // modified state during a Supabase load, preventing the load from overwriting.
+  const userActionRef = useRef(0);
+  const getUserActionVersion = useCallback(() => userActionRef.current, []);
 
   const setDwellMinutes = useCallback((placeId: string, minutes: number) => {
     setDwellMinutesState(prev => ({ ...prev, [placeId]: minutes }));
   }, []);
 
   const addToGo = useCallback((ids: string[]) => {
+    userActionRef.current++;
     setToGoIds(prev => {
       const newIds = ids.filter(id => !prev.includes(id));
       return [...prev, ...newIds];
@@ -87,10 +94,12 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeFromToGo = useCallback((id: string) => {
+    userActionRef.current++;
     setToGoIds(prev => prev.filter(i => i !== id));
   }, []);
 
   const addToMyDays = useCallback((ids: string[]) => {
+    userActionRef.current++;
     setMyDaysIds(prev => {
       const newIds = ids.filter(id => !prev.includes(id));
       return [...prev, ...newIds];
@@ -160,6 +169,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startNewItinerary = useCallback((placeIds: string[]) => {
+    userActionRef.current++;
     // 작업중인 일정이 있으면 자동 저장
     if (myDaysIds.length > 0) {
       setSavedItineraries(prev => [
@@ -226,7 +236,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
         clearToGo, clearMyDays,
         addCustomPlace, removeCustomPlace,
         saveCurrentAsItinerary, deleteItinerary, renameItinerary, loadItinerary, startNewItinerary,
-        loadFromSupabase, clearAll,
+        loadFromSupabase, clearAll, getUserActionVersion,
       }}>
       {children}
     </TripContext.Provider>
