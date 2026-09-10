@@ -51,6 +51,7 @@ type TripStore = {
   renameItinerary: (id: string, name: string) => void;
   loadItinerary: (itinerary: SavedItinerary) => void;
   startNewItinerary: (placeIds: string[]) => void;
+  addToSavedItinerary: (id: string, placeIds: string[]) => void;
   loadFromSupabase: (data: {
     toGoIds: string[];
     myDaysIds: string[];
@@ -168,6 +169,14 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
     setDepartureTime(itinerary.departureTime);
   }, []);
 
+  const addToSavedItinerary = useCallback((id: string, placeIds: string[]) => {
+    setSavedItineraries(prev => prev.map(itin =>
+      itin.id === id
+        ? { ...itin, placeIds: [...itin.placeIds, ...placeIds.filter(p => !itin.placeIds.includes(p))] }
+        : itin,
+    ));
+  }, []);
+
   const startNewItinerary = useCallback((placeIds: string[]) => {
     userActionRef.current++;
     // 작업중인 일정이 있으면 자동 저장
@@ -235,7 +244,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
         setDwellMinutes,
         clearToGo, clearMyDays,
         addCustomPlace, removeCustomPlace,
-        saveCurrentAsItinerary, deleteItinerary, renameItinerary, loadItinerary, startNewItinerary,
+        saveCurrentAsItinerary, deleteItinerary, renameItinerary, loadItinerary, startNewItinerary, addToSavedItinerary,
         loadFromSupabase, clearAll, getUserActionVersion,
       }}>
       {children}

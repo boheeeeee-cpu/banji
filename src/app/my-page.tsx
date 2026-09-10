@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 
 import MyDaysPanel from '@/components/my-days-panel';
 import ToGoPanel from '@/components/to-go-panel';
@@ -25,6 +25,7 @@ export default function MyPage() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { user, signOut } = useAuthStore();
   const { toGoIds, myDaysIds, savedItineraries, deleteItinerary, renameItinerary, loadItinerary } = useTripStore();
   const params = useLocalSearchParams<{ section?: string }>();
@@ -34,6 +35,14 @@ export default function MyPage() {
   const [pet, setPet] = useState<PetProfile>({ name: '', age_years: '' });
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
+
+  // 이미 마이 탭에 있을 때 탭 버튼을 누르면 서브뷰에서 마이 메인으로 복귀
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('tabPress', () => {
+      setActiveView(null);
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     if (params.section) setActiveView(params.section as ActiveView);
@@ -82,51 +91,50 @@ export default function MyPage() {
             <ThemedText style={styles.headerTitle}>내 일정 목록</ThemedText>
           </View>
           <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
-            {/* 작업 중인 일정 */}
+            {/* 통합 일정 목록: 작업 중 + 저장된 일정 구분 없이 순서대로 */}
             {hasActive && (
-              <>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>작업 중</ThemedText>
-                <Pressable
-                  style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}
-                  onPress={() => setActiveView('mydays')}>
-                  <View style={styles.itineraryInfo}>
-                    <ThemedText style={styles.itineraryName}>미저장 일정</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">{myDaysIds.length}곳</ThemedText>
-                  </View>
-                  <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
-                </Pressable>
-              </>
+              <Pressable
+                style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}
+                onPress={() => setActiveView('mydays')}>
+                <View style={[styles.itineraryBadge, { backgroundColor: Brand.primary }]}>
+                  <ThemedText style={styles.itineraryBadgeText}>●</ThemedText>
+                </View>
+                <View style={styles.itineraryInfo}>
+                  <ThemedText style={styles.itineraryName}>미저장 일정</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">{myDaysIds.length}곳</ThemedText>
+                </View>
+                <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
+              </Pressable>
             )}
 
-            {/* 저장된 일정 목록 */}
-            {savedItineraries.length > 0 && (
-              <>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>저장된 일정</ThemedText>
-                {savedItineraries.map(item => (
-                  <View key={item.id} style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}>
-                    <Pressable
-                      style={styles.itineraryInfo}
-                      onPress={() => {
-                        loadItinerary(item);
-                        setActiveView('mydays');
-                      }}>
-                      <ThemedText style={styles.itineraryName}>{item.name}</ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {item.placeIds.length}곳 · {new Date(item.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
-                      </ThemedText>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => { setRenamingId(item.id); setRenameText(item.name); }}
-                      hitSlop={8} style={styles.actionBtn}>
-                      <ThemedText type="small" themeColor="textSecondary">✏️</ThemedText>
-                    </Pressable>
-                    <Pressable onPress={() => deleteItinerary(item.id)} hitSlop={8} style={styles.actionBtn}>
-                      <ThemedText type="small" themeColor="textSecondary">✕</ThemedText>
-                    </Pressable>
-                  </View>
-                ))}
-              </>
-            )}
+            {savedItineraries.map((item, idx) => (
+              <View key={item.id} style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}>
+                <View style={[styles.itineraryBadge, { backgroundColor: colors.backgroundSelected }]}>
+                  <ThemedText style={[styles.itineraryBadgeText, { color: colors.text }]}>
+                    {hasActive ? idx + 2 : idx + 1}
+                  </ThemedText>
+                </View>
+                <Pressable
+                  style={styles.itineraryInfo}
+                  onPress={() => {
+                    loadItinerary(item);
+                    setActiveView('mydays');
+                  }}>
+                  <ThemedText style={styles.itineraryName}>{item.name}</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {item.placeIds.length}곳 · {new Date(item.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setRenamingId(item.id); setRenameText(item.name); }}
+                  hitSlop={8} style={styles.actionBtn}>
+                  <ThemedText type="small" themeColor="textSecondary">✏️</ThemedText>
+                </Pressable>
+                <Pressable onPress={() => deleteItinerary(item.id)} hitSlop={8} style={styles.actionBtn}>
+                  <ThemedText type="small" themeColor="textSecondary">✕</ThemedText>
+                </Pressable>
+              </View>
+            ))}
 
             {!hasActive && savedItineraries.length === 0 && (
               <View style={styles.emptyState}>
@@ -351,8 +359,18 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.two,
     marginBottom: Spacing.two,
   },
+  itineraryBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  itineraryBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFF' },
   itineraryInfo: { flex: 1, gap: 3 },
   itineraryName: { fontSize: 15, fontWeight: '700' },
   actionBtn: { padding: Spacing.one },

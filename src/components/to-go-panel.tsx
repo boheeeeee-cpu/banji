@@ -13,8 +13,12 @@ export default function ToGoPanel() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const { toGoIds, myDaysIds, removeFromToGo, addToMyDays, startNewItinerary, customPlaces, removeCustomPlace } = useTripStore();
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const {
+    toGoIds, myDaysIds, savedItineraries,
+    removeFromToGo, addToMyDays, startNewItinerary, addToSavedItinerary,
+    customPlaces, removeCustomPlace,
+  } = useTripStore();
 
   const toGoPlaces = RECOMMENDED_PLACES.filter(p => toGoIds.includes(p.id));
   const toGoCustom = customPlaces.filter(p => toGoIds.includes(p.id));
@@ -24,26 +28,40 @@ export default function ToGoPanel() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const handleAddToMyDays = () => {
-    if (myDaysIds.length > 0) {
-      // 작업 중인 일정이 있으면 모달 표시
-      setAddModalVisible(true);
+  const getPlaceNames = (placeIds: string[]) => {
+    const names = placeIds.slice(0, 4).map(id => {
+      const c = RECOMMENDED_PLACES.find(p => p.id === id);
+      if (c) return c.name;
+      const cu = customPlaces.find(p => p.id === id);
+      return cu?.name ?? '';
+    }).filter(Boolean);
+    const suffix = placeIds.length > 4 ? ` 외 ${placeIds.length - 4}곳` : '';
+    return names.join(' · ') + suffix;
+  };
+
+  const handleAddTap = () => {
+    if (myDaysIds.length > 0 || savedItineraries.length > 0) {
+      setPickerVisible(true);
     } else {
       addToMyDays(selectedIds);
       setSelectedIds([]);
     }
   };
 
-  const handleAddToCurrent = () => {
-    addToMyDays(selectedIds);
+  const selectItinerary = (targetId: 'current' | string) => {
+    if (targetId === 'current') {
+      addToMyDays(selectedIds);
+    } else {
+      addToSavedItinerary(targetId, selectedIds);
+    }
     setSelectedIds([]);
-    setAddModalVisible(false);
+    setPickerVisible(false);
   };
 
   const handleStartNew = () => {
     startNewItinerary(selectedIds);
     setSelectedIds([]);
-    setAddModalVisible(false);
+    setPickerVisible(false);
   };
 
   if (isEmpty) {
@@ -121,24 +139,62 @@ export default function ToGoPanel() {
 
       {selectedIds.length > 0 && (
         <View style={styles.bottomBar}>
-          <Pressable onPress={handleAddToMyDays} style={styles.addButton}>
+          <Pressable onPress={handleAddTap} style={styles.addButton}>
             <ThemedText style={styles.addButtonText}>내 일정에 추가 ({selectedIds.length})</ThemedText>
           </Pressable>
         </View>
       )}
 
-      <Modal visible={addModalVisible} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setAddModalVisible(false)}>
-          <Pressable style={[styles.modalBox, { backgroundColor: colors.background }]} onPress={() => {}}>
-            <ThemedText style={styles.modalTitle}>어떻게 추가할까요?</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.modalDesc}>
-              지금 작업 중인 일정이 있어요
-            </ThemedText>
-            <Pressable style={[styles.modalBtn, { backgroundColor: Brand.primary }]} onPress={handleAddToCurrent}>
-              <ThemedText style={styles.modalBtnText}>현재 일정에 추가</ThemedText>
-            </Pressable>
-            <Pressable style={[styles.modalBtn, { backgroundColor: colors.backgroundElement }]} onPress={handleStartNew}>
-              <ThemedText style={styles.modalBtnTextAlt}>새 일정으로 시작</ThemedText>
+      {/* 일정 선택 모달 */}
+      <Modal visible={pickerVisible} transparent animationType="slide">
+        <Pressable style={styles.pickerOverlay} onPress={() => setPickerVisible(false)}>
+          <Pressable style={[styles.pickerSheet, { backgroundColor: colors.background }]} onPress={() => {}}>
+            <View style={styles.pickerHandle} />
+            <ThemedText style={styles.pickerTitle}>어느 일정에 추가할까요?</ThemedText>
+
+            <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+              {/* 현재 작업 중 일정 */}
+              {myDaysIds.length > 0 && (
+                <Pressable
+                  style={[styles.itinRow, { borderColor: colors.backgroundElement }]}
+                  onPress={() => selectItinerary('current')}>
+                  <View style={styles.itinLeft}>
+                    <View style={[styles.itinBadge, { backgroundColor: Brand.primary }]}>
+                      <ThemedText style={styles.itinBadgeText}>진행 중</ThemedText>
+                    </View>
+                    <ThemedText style={styles.itinName}>미저장 일정</ThemedText>
+                  </View>
+                  {myDaysIds.length > 0 && (
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.itinPlaces} numberOfLines={2}>
+                      {getPlaceNames(myDaysIds)}
+                    </ThemedText>
+                  )}
+                </Pressable>
+              )}
+
+              {/* 저장된 일정들 */}
+              {savedItineraries.map((itin, idx) => (
+                <Pressable
+                  key={itin.id}
+                  style={[styles.itinRow, { borderColor: colors.backgroundElement }]}
+                  onPress={() => selectItinerary(itin.id)}>
+                  <View style={styles.itinLeft}>
+                    <View style={[styles.itinBadge, { backgroundColor: colors.backgroundElement }]}>
+                      <ThemedText style={[styles.itinBadgeText, { color: colors.text }]}>{idx + 1}</ThemedText>
+                    </View>
+                    <ThemedText style={styles.itinName} numberOfLines={1}>{itin.name}</ThemedText>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.itinPlaces} numberOfLines={2}>
+                    {getPlaceNames(itin.placeIds)}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <Pressable
+              style={[styles.newBtn, { borderColor: colors.backgroundElement }]}
+              onPress={handleStartNew}>
+              <ThemedText style={styles.newBtnText}>＋ 새 일정으로 시작</ThemedText>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -167,11 +223,33 @@ const styles = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: Spacing.three, left: Spacing.four, right: Spacing.four },
   addButton: { backgroundColor: Brand.primary, borderRadius: Spacing.three, paddingVertical: Spacing.three, alignItems: 'center' },
   addButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { width: 300, borderRadius: 20, padding: Spacing.four, gap: Spacing.two },
-  modalTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  modalDesc: { textAlign: 'center', marginBottom: Spacing.one },
-  modalBtn: { height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  modalBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
-  modalBtnTextAlt: { fontWeight: '600', fontSize: 15 },
+
+  // 일정 선택 모달 (바텀시트)
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  pickerSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: Spacing.two, paddingBottom: 36, maxHeight: '80%' },
+  pickerHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#CCC', alignSelf: 'center', marginBottom: Spacing.three },
+  pickerTitle: { fontSize: 17, fontWeight: '700', paddingHorizontal: Spacing.four, marginBottom: Spacing.two },
+  pickerScroll: { maxHeight: 420 },
+  itinRow: {
+    marginHorizontal: Spacing.four,
+    marginBottom: Spacing.two,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: Spacing.three,
+    gap: 6,
+  },
+  itinLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  itinBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  itinBadgeText: { fontSize: 11, fontWeight: '700', color: '#FFF' },
+  itinName: { fontSize: 15, fontWeight: '700', flex: 1 },
+  itinPlaces: { fontSize: 12, lineHeight: 18 },
+  newBtn: {
+    marginHorizontal: Spacing.four,
+    marginTop: Spacing.one,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: Spacing.three,
+    alignItems: 'center',
+  },
+  newBtnText: { fontSize: 15, fontWeight: '600' },
 });
