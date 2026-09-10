@@ -39,23 +39,17 @@ function addMinutes(timeStr: string, minutes: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-function buildNaverMapUrl(
+type NavUrls = { nmapUrl: string; webUrl: string };
+
+function buildNavUrls(
   points: { lat: number; lng: number; name: string }[],
-): string | null {
+): NavUrls | null {
   if (points.length < 2) return null;
   const start = points[0];
   const dest = points[points.length - 1];
   const via = points.slice(1, -1).slice(0, 5);
 
-  if (Platform.OS === 'web') {
-    const seg = (p: { lng: number; lat: number; name: string }) =>
-      `${p.lng},${p.lat},${encodeURIComponent(p.name)}`;
-    const viaSeg = via.map(seg).join('/');
-    const middle = viaSeg ? `${viaSeg}/` : '';
-    return `https://map.naver.com/p/directions/${seg(start)}/${middle}${seg(dest)}/car/summary`;
-  }
-
-  // 네이티브: nmap 딥링크
+  // nmap 딥링크 (네이티브 앱 + 모바일 브라우저에서 앱 열기)
   const p = new URLSearchParams();
   p.set('slat', String(start.lat));
   p.set('slng', String(start.lng));
@@ -69,7 +63,31 @@ function buildNaverMapUrl(
   p.set('dlng', String(dest.lng));
   p.set('dname', dest.name);
   p.set('appname', 'com.banji.app');
-  return `nmap://route/car?${p.toString()}`;
+  const nmapUrl = `nmap://route/car?${p.toString()}`;
+
+  // 웹 URL (데스크탑 브라우저 폴백)
+  const seg = (pt: { lng: number; lat: number; name: string }) =>
+    `${pt.lng},${pt.lat},${encodeURIComponent(pt.name)}`;
+  const viaSeg = via.map(seg).join('/');
+  const middle = viaSeg ? `${viaSeg}/` : '';
+  const webUrl = `https://map.naver.com/p/directions/${seg(start)}/${middle}${seg(dest)}/car/summary`;
+
+  return { nmapUrl, webUrl };
+}
+
+function openNavigation(urls: NavUrls) {
+  if (Platform.OS !== 'web') {
+    Linking.openURL(urls.nmapUrl);
+    return;
+  }
+  // 모바일 브라우저: nmap 딥링크로 앱 직접 열기 (자동차 모드 보장)
+  const isMobile = typeof navigator !== 'undefined'
+    && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = urls.nmapUrl;
+  } else {
+    window.open(urls.webUrl, '_blank');
+  }
 }
 
 type Entry =
@@ -387,15 +405,14 @@ export default function MyDaysPanel() {
               <View style={styles.navSegmentContainer}>
                 {pts.slice(0, -1).map((from, i) => {
                   const to = pts[i + 1];
-                  const url = buildNaverMapUrl([from, to]);
+                  const urls = buildNavUrls([from, to]);
                   return (
                     <Pressable
                       key={i}
                       style={[styles.navSegmentBtn, { backgroundColor: '#03C75A' }]}
                       onPress={() => {
-                        if (!url) return;
-                        if (Platform.OS === 'web') window.open(url, '_blank');
-                        else Linking.openURL(url);
+                        if (!urls) return;
+                        openNavigation(urls);
                       }}>
                       <ThemedText style={styles.navSegmentBtnText} numberOfLines={1}>
                         🧭 {i + 1}번 → {i + 2}번 · {from.name} → {to.name}
