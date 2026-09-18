@@ -91,6 +91,22 @@ export async function fetchPetDetail(contentId: string): Promise<PetTourItem | n
   return items[0] ?? null;
 }
 
+export type FestivalItem = TourItem & {
+  eventstartdate: string;
+  eventenddate: string;
+};
+
+// 거제 행사/축제 목록 (올해 전체)
+export async function fetchGeojeEvents(): Promise<FestivalItem[]> {
+  const year = new Date().getFullYear();
+  const all = await get<FestivalItem>('KorService2/searchFestival2', {
+    eventStartDate: `${year}0101`,
+    numOfRows: '100',
+    pageNo: '1',
+  });
+  return all.filter(e => e.addr1?.includes('거제'));
+}
+
 export type PlaceImage = {
   originimgurl: string;
   smallimageurl: string;

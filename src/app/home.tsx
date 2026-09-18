@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -11,6 +11,7 @@ import { Brand } from '@/constants/brand';
 import { Spacing } from '@/constants/theme';
 import { RECOMMENDED_PLACES } from '@/data/places';
 import { RECOMMENDED_ROUTES, type RecommendedRoute } from '@/data/routes';
+import { fetchGeojeEvents, type FestivalItem } from '@/lib/tour-api';
 import { useTripStore } from '@/store/trip-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,10 +26,17 @@ export default function HomeScreen() {
   const { toGoIds, myDaysIds, savedItineraries, addToGo, startNewItinerary } = useTripStore();
   const totalItineraries = savedItineraries.length + (myDaysIds.length > 0 ? 1 : 0);
   const [selectedRoute, setSelectedRoute] = useState<RecommendedRoute | null>(null);
+  const [events, setEvents] = useState<FestivalItem[]>([]);
+  const eventCache = useRef<FestivalItem[] | null>(null);
 
   const featured = FEATURED_IDS
     .map(id => RECOMMENDED_PLACES.find(p => p.id === id))
     .filter(Boolean) as typeof RECOMMENDED_PLACES;
+
+  useEffect(() => {
+    if (eventCache.current) { setEvents(eventCache.current); return; }
+    fetchGeojeEvents().then(data => { eventCache.current = data; setEvents(data); }).catch(() => {});
+  }, []);
 
   const handleStartRoute = (route: RecommendedRoute) => {
     startNewItinerary(route.placeIds);
@@ -85,6 +93,49 @@ export default function HomeScreen() {
 
         {/* 인기 여행지 */}
         <PopularPlacesRow />
+
+        {/* 거제 행사/축제 */}
+        {events.length > 0 && (
+          <View style={styles.eventSection}>
+            <ThemedText style={styles.sectionTitle}>🎉 거제 행사·축제</ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.eventScroll}>
+              {events.map(ev => {
+                const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                const ended = ev.eventenddate < today;
+                const formatDate = (d: string) => `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
+                return (
+                  <Pressable
+                    key={ev.contentid}
+                    style={[styles.eventCard, { backgroundColor: theme.backgroundElement }]}
+                    onPress={() => {
+                      const url = `https://map.naver.com/p/search/${encodeURIComponent(ev.title + ' 거제')}`;
+                      if (Platform.OS === 'web') window.open(url, '_blank');
+                      else Linking.openURL(url);
+                    }}>
+                    {ev.firstimage ? (
+                      <Image source={{ uri: ev.firstimage }} style={styles.eventThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.eventThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.primary + '20' }]}>
+                        <ThemedText style={{ fontSize: 28 }}>🎊</ThemedText>
+                      </View>
+                    )}
+                    <View style={styles.eventInfo}>
+                      <ThemedText style={styles.eventName} numberOfLines={2}>{ev.title}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {formatDate(ev.eventstartdate)} ~ {formatDate(ev.eventenddate)}
+                      </ThemedText>
+                      {ended && (
+                        <View style={styles.endedBadge}>
+                          <ThemedText style={styles.endedText}>종료됨</ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* 추천 장소 */}
         <View style={styles.featuredSection}>
@@ -213,6 +264,19 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' },
   tag: { backgroundColor: Brand.primary + '18', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { fontSize: 11, color: Brand.primary, fontWeight: '600' },
+
+  eventSection: { gap: Spacing.two },
+  eventScroll: { gap: Spacing.two, paddingRight: Spacing.four },
+  eventCard: {
+    width: 200,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  eventThumb: { width: '100%', height: 110 },
+  eventInfo: { padding: Spacing.two, gap: 4 },
+  eventName: { fontSize: 13, fontWeight: '700' },
+  endedBadge: { backgroundColor: '#F3F4F6', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' },
+  endedText: { fontSize: 10, fontWeight: '700', color: '#9CA3AF' },
 
   featuredSection: { gap: Spacing.two },
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.one },
