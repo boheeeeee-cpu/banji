@@ -10,6 +10,7 @@ export type TourItem = {
   firstimage: string;
   tel: string;
   contenttypeid?: string;
+  dist?: string;
 };
 
 export type PetTourItem = TourItem & {
@@ -89,6 +90,23 @@ export async function fetchPetDetail(contentId: string): Promise<PetTourItem | n
     contentId,
   });
   return items[0] ?? null;
+}
+
+// 현재 위치 기반 근처 관광지 (KorService2/locationBasedList2)
+export async function fetchNearbyAttractions(
+  lat: number,
+  lng: number,
+  radiusM = 5000,
+  count = 8,
+): Promise<TourItem[]> {
+  return get<TourItem>('KorService2/locationBasedList2', {
+    mapX: String(lng),
+    mapY: String(lat),
+    radius: String(radiusM),
+    contentTypeId: '12',
+    numOfRows: String(count),
+    pageNo: '1',
+  });
 }
 
 export type FestivalItem = TourItem & {

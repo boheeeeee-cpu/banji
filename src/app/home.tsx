@@ -11,7 +11,7 @@ import { Brand } from '@/constants/brand';
 import { Spacing } from '@/constants/theme';
 import { RECOMMENDED_PLACES } from '@/data/places';
 import { RECOMMENDED_ROUTES, type RecommendedRoute } from '@/data/routes';
-import { fetchGeojeEvents, type FestivalItem } from '@/lib/tour-api';
+import { fetchGeojeEvents, fetchNearbyAttractions, type FestivalItem, type TourItem } from '@/lib/tour-api';
 import { useTripStore } from '@/store/trip-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,6 +28,9 @@ export default function HomeScreen() {
   const [selectedRoute, setSelectedRoute] = useState<RecommendedRoute | null>(null);
   const [events, setEvents] = useState<FestivalItem[]>([]);
   const eventCache = useRef<FestivalItem[] | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<TourItem[]>([]);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [nearbyError, setNearbyError] = useState(false);
 
   const featured = FEATURED_IDS
     .map(id => RECOMMENDED_PLACES.find(p => p.id === id))
@@ -37,6 +40,22 @@ export default function HomeScreen() {
     if (eventCache.current) { setEvents(eventCache.current); return; }
     fetchGeojeEvents().then(data => { eventCache.current = data; setEvents(data); }).catch(() => {});
   }, []);
+
+  const loadNearby = () => {
+    if (!navigator.geolocation) { setNearbyError(true); return; }
+    setNearbyLoading(true);
+    setNearbyError(false);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        fetchNearbyAttractions(pos.coords.latitude, pos.coords.longitude)
+          .then(data => setNearbyPlaces(data))
+          .catch(() => setNearbyError(true))
+          .finally(() => setNearbyLoading(false));
+      },
+      () => { setNearbyLoading(false); setNearbyError(true); },
+      { timeout: 8000 },
+    );
+  };
 
   const handleStartRoute = (route: RecommendedRoute) => {
     startNewItinerary(route.placeIds);
@@ -136,6 +155,58 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         )}
+
+        {/* 내 주변 관광지 */}
+        <View style={styles.nearbySection}>
+          <View style={styles.nearbyHeader}>
+            <ThemedText style={styles.sectionTitle}>📡 내 주변 관광지</ThemedText>
+            {nearbyPlaces.length === 0 && !nearbyLoading && (
+              <Pressable
+                onPress={loadNearby}
+                style={[styles.nearbyBtn, { backgroundColor: Brand.primary }]}>
+                <ThemedText style={styles.nearbyBtnText}>
+                  {nearbyError ? '재시도' : '위치 허용'}
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
+          {nearbyLoading && (
+            <ThemedText type="small" themeColor="textSecondary">위치 확인 중…</ThemedText>
+          )}
+          {!nearbyLoading && nearbyError && nearbyPlaces.length === 0 && (
+            <ThemedText type="small" themeColor="textSecondary">위치 정보를 가져올 수 없습니다</ThemedText>
+          )}
+          {nearbyPlaces.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.nearbyScroll}>
+              {nearbyPlaces.map(place => {
+                const distKm = Number(place.dist) / 1000;
+                const distLabel = distKm < 1 ? `${Math.round(Number(place.dist))}m` : `${distKm.toFixed(1)}km`;
+                return (
+                  <Pressable
+                    key={place.contentid}
+                    style={[styles.nearbyCard, { backgroundColor: theme.backgroundElement }]}
+                    onPress={() => {
+                      const url = `https://map.naver.com/p/search/${encodeURIComponent(place.title + ' 거제')}`;
+                      if (Platform.OS === 'web') window.open(url, '_blank');
+                      else Linking.openURL(url);
+                    }}>
+                    {place.firstimage ? (
+                      <Image source={{ uri: place.firstimage }} style={styles.nearbyThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.nearbyThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.primary + '15' }]}>
+                        <ThemedText style={{ fontSize: 24 }}>🏞️</ThemedText>
+                      </View>
+                    )}
+                    <View style={styles.nearbyInfo}>
+                      <ThemedText style={styles.nearbyName} numberOfLines={1}>{place.title}</ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">{distLabel}</ThemedText>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
 
         {/* 추천 장소 */}
         <View style={styles.featuredSection}>
@@ -264,6 +335,16 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: 'row', gap: 4, marginTop: 4, flexWrap: 'wrap' },
   tag: { backgroundColor: Brand.primary + '18', borderRadius: 20, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { fontSize: 11, color: Brand.primary, fontWeight: '600' },
+
+  nearbySection: { gap: Spacing.two },
+  nearbyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  nearbyBtn: { paddingHorizontal: Spacing.two, paddingVertical: 5, borderRadius: 20 },
+  nearbyBtnText: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+  nearbyScroll: { gap: Spacing.two, paddingRight: Spacing.four },
+  nearbyCard: { width: 130, borderRadius: 12, overflow: 'hidden' },
+  nearbyThumb: { width: '100%', height: 90 },
+  nearbyInfo: { padding: Spacing.two, gap: 2 },
+  nearbyName: { fontSize: 12, fontWeight: '700' },
 
   eventSection: { gap: Spacing.two },
   eventScroll: { gap: Spacing.two, paddingRight: Spacing.four },
