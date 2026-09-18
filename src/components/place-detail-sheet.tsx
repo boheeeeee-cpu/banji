@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
+import { Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { PlacePhoto } from '@/components/place-photo';
@@ -9,9 +9,12 @@ import { Brand } from '@/constants/brand';
 import { Colors, Spacing } from '@/constants/theme';
 import { PLACE_TYPE_LABELS, type Place } from '@/data/places';
 import { searchNaverLocal, type NaverLocalResult } from '@/lib/naver-search';
+import { fetchPlaceImages, type PlaceImage } from '@/lib/tour-api';
 import { useTripStore } from '@/store/trip-store';
 
 type ParkingResult = NaverLocalResult & { distanceKm: number; isFree: boolean };
+
+const SCREEN_W = Dimensions.get('window').width;
 
 const FREE_KEYWORDS = ['무료', '학동', '해금강', '구조라', '조선해양', '김영삼', '칠천량', '맹종죽', '스포츠파크', '대금산', '국립공원'];
 
@@ -34,13 +37,27 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
   const [parkingList, setParkingList] = useState<ParkingResult[]>([]);
   const [parkingLoading, setParkingLoading] = useState(false);
   const [addedParkingTitles, setAddedParkingTitles] = useState<Set<string>>(new Set());
+  const [tourImages, setTourImages] = useState<PlaceImage[]>([]);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const parkingCache = useRef<Record<string, ParkingResult[]>>({});
+  const imageCache = useRef<Record<string, PlaceImage[]>>({});
 
   const { toGoIds, myDaysIds, addToGo, addToMyDays, startNewItinerary, addCustomPlace } = useTripStore();
   const scheme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const sheetBg = Colors[scheme].background;
   const handleColor = scheme === 'dark' ? '#555' : '#DDD';
   const router = useRouter();
+
+  useEffect(() => {
+    if (!visible || !place?.contentId) { setTourImages([]); setActivePhotoIdx(0); return; }
+    const cid = place.contentId;
+    if (imageCache.current[cid]) { setTourImages(imageCache.current[cid]); setActivePhotoIdx(0); return; }
+    fetchPlaceImages(cid).then(imgs => {
+      imageCache.current[cid] = imgs;
+      setTourImages(imgs);
+      setActivePhotoIdx(0);
+    }).catch(() => setTourImages([]));
+  }, [visible, place?.contentId]);
 
   useEffect(() => {
     if (!visible || !place) return;
@@ -136,8 +153,32 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
       <View style={[styles.sheet, { backgroundColor: sheetBg }]}>
         <View style={[styles.handleBar, { backgroundColor: handleColor }]} />
 
-        {/* 대표사진 */}
-        {place.photoUrl ? (
+        {/* 사진 갤러리 */}
+        {tourImages.length > 0 ? (
+          <View style={styles.galleryWrap}>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={e => {
+                setActivePhotoIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W));
+              }}>
+              {tourImages.map((img, i) => (
+                <Image key={i} source={{ uri: img.originimgurl }} style={[styles.headerPhoto, { width: SCREEN_W }]} resizeMode="cover" />
+              ))}
+            </ScrollView>
+            {tourImages.length > 1 && (
+              <View style={styles.dotRow}>
+                {tourImages.map((_, i) => (
+                  <View key={i} style={[styles.dot, i === activePhotoIdx && styles.dotActive]} />
+                ))}
+              </View>
+            )}
+            <View style={styles.photoSourceBadge}>
+              <ThemedText style={styles.photoSourceText}>한국관광공사</ThemedText>
+            </View>
+          </View>
+        ) : place.photoUrl ? (
           <Image source={{ uri: place.photoUrl }} style={styles.headerPhoto} resizeMode="cover" />
         ) : (
           <View style={styles.emojiHeader}>
@@ -370,6 +411,26 @@ const styles = StyleSheet.create({
   },
   headerPhoto: { width: '100%', height: 200 },
   emojiHeader: { alignItems: 'center', paddingVertical: Spacing.three },
+  galleryWrap: { position: 'relative', height: 200, overflow: 'hidden' },
+  dotRow: {
+    position: 'absolute',
+    bottom: 8,
+    left: 0, right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.5)' },
+  dotActive: { backgroundColor: '#FFF', width: 14 },
+  photoSourceBadge: {
+    position: 'absolute',
+    bottom: 8, right: 10,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  photoSourceText: { fontSize: 10, color: '#FFF' },
   body: { padding: Spacing.four, paddingBottom: Spacing.three, gap: Spacing.three },
 
   titleRow: { gap: 6 },

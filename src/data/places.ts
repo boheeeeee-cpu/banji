@@ -30,6 +30,7 @@ export type Place = {
   operatingHours?: string;       // 운영시간 (OPER_TIME)
   closedDays?: string;           // 휴무일
   parkingNote?: string;          // 주차 안내
+  contentId?: string;            // 한국관광공사 TourAPI contentId (사진 자동 연동용)
 };
 
 export const PLACE_TYPES = [
@@ -309,6 +310,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     petNote: '반려견 전용 댕해수욕장 구역 있음 · 목줄 착용 필수',
     imageEmoji: '🐾',
     imageTint: '#C4F0E8',
+    contentId: '126577',
   },
   // 관광지
   {
@@ -341,6 +343,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     petNote: '리드줄 착용 시 동반 가능',
     imageEmoji: '🏖️',
     imageTint: '#C4E8FF',
+    contentId: '127939',
   },
   {
     id: '17',
@@ -704,6 +707,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     imageEmoji: '🏝️',
     imageTint: '#E0F2F1',
     photoUrl: 'http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172983776828051.jpg',
+    contentId: '578459',
   },
   {
     id: 'geoje_포로수용소_유적공원',
@@ -720,6 +724,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     imageEmoji: '🏛️',
     imageTint: '#FFF8E1',
     photoUrl: 'http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283463031628.jpg',
+    contentId: '127938',
   },
   {
     id: 'geoje_외도',
@@ -768,6 +773,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     imageEmoji: '🌊',
     imageTint: '#E0F2F1',
     photoUrl: 'http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283425203628.jpg',
+    contentId: '2652447',
   },
   {
     id: 'geoje_해금강',
@@ -816,6 +822,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     imageEmoji: '🏖️',
     imageTint: '#E3F2FD',
     photoUrl: 'http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/153023808099642.jpg',
+    contentId: '2723610',
   },
   {
     id: 'geoje_칠천량해전공원',

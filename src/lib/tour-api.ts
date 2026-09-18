@@ -79,3 +79,20 @@ export async function fetchPetDetail(contentId: string): Promise<PetTourItem | n
   });
   return items[0] ?? null;
 }
+
+export type PlaceImage = {
+  originimgurl: string;
+  smallimageurl: string;
+  imgname: string;
+  serialnum: string;
+};
+
+// contentId로 대표사진 + 상세 이미지 목록 조회 (KorService2/detailImage2)
+export async function fetchPlaceImages(contentId: string): Promise<PlaceImage[]> {
+  return get<PlaceImage>('KorService2/detailImage2', {
+    contentId,
+    imageYN: 'Y',
+    numOfRows: '10',
+    pageNo: '1',
+  });
+}
