@@ -34,6 +34,17 @@ async function get<T>(endpoint: string, params: Record<string, string>): Promise
   return Array.isArray(items) ? items : [items];
 }
 
+// 거제 숙소 목록 (KorService2, contentTypeId=32)
+export async function fetchGeojeStays(): Promise<TourItem[]> {
+  return get<TourItem>('KorService2/areaBasedList2', {
+    areaCode: '36',
+    sigunguCode: '1',
+    contentTypeId: '32',
+    numOfRows: '50',
+    pageNo: '1',
+  });
+}
+
 // 거제 해수욕장 목록 (KorService2)
 export async function fetchGeojeBeaches(): Promise<TourItem[]> {
   return get<TourItem>('KorService2/areaBasedList2', {

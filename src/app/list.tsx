@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/brand';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { PLACE_TYPES, PLACE_TYPE_LABELS, RECOMMENDED_PLACES, type Place, type PlaceType } from '@/data/places';
+import { fetchGeojeStays, type TourItem } from '@/lib/tour-api';
 import { fetchGeojePetPharmacies, type VetPharmacy } from '@/lib/vet-pharmacy-api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTripStore } from '@/store/trip-store';
@@ -32,7 +33,9 @@ export default function ListScreen() {
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [pharmacies, setPharmacies] = useState<VetPharmacy[]>([]);
   const [addedPharmacyNames, setAddedPharmacyNames] = useState<Set<string>>(new Set());
+  const [tourStays, setTourStays] = useState<TourItem[]>([]);
   const pharmacyCache = useRef<VetPharmacy[] | null>(null);
+  const stayCache = useRef<TourItem[] | null>(null);
   const { toGoIds, myDaysIds, addCustomPlace, addToMyDays } = useTripStore();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -43,6 +46,14 @@ export default function ListScreen() {
       .then(data => { pharmacyCache.current = data; setPharmacies(data); })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (category !== 'stay' && category !== 'all') return;
+    if (stayCache.current) { setTourStays(stayCache.current); return; }
+    fetchGeojeStays()
+      .then(data => { stayCache.current = data; setTourStays(data); })
+      .catch(() => {});
+  }, [category]);
 
   const allItems = useMemo<ListItem[]>(() => {
     const places: ListItem[] = RECOMMENDED_PLACES.map(p => ({ kind: 'place', data: p }));
@@ -134,7 +145,7 @@ export default function ListScreen() {
           { paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
         ]}
         keyboardDismissMode="on-drag">
-        {filtered.length === 0 && (
+        {filtered.length === 0 && (category === 'stay' ? tourStays.length === 0 : true) && (
           <View style={styles.noResults}>
             <ThemedText type="small" themeColor="textSecondary">검색 결과 없음</ThemedText>
           </View>
@@ -188,6 +199,48 @@ export default function ListScreen() {
             );
           }
         })}
+        {/* TourAPI 숙소 섹션 (숙소 필터 또는 전체) */}
+        {(category === 'stay' || category === 'all') && tourStays.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>거제 관광공사 등록 숙소</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">반려동물 동반 전 전화 확인 권장</ThemedText>
+            </View>
+            {tourStays.map(stay => (
+              <Pressable
+                key={`tour-stay-${stay.contentid}`}
+                onPress={() => {
+                  const url = `https://map.naver.com/p/search/${encodeURIComponent(stay.title + ' 거제')}`;
+                  if (Platform.OS === 'web') window.open(url, '_blank');
+                  else Linking.openURL(url);
+                }}
+                style={({ pressed }) => [styles.tourStayRow, pressed && styles.pressed]}>
+                {stay.firstimage ? (
+                  <Image source={{ uri: stay.firstimage }} style={styles.tourStayThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.tourStayThumb, styles.tourStayThumbEmpty]}>
+                    <ThemedText style={{ fontSize: 20 }}>🏨</ThemedText>
+                  </View>
+                )}
+                <View style={styles.info}>
+                  <View style={styles.nameRow}>
+                    <ThemedText style={styles.name} numberOfLines={1}>{stay.title}</ThemedText>
+                    <View style={[styles.badge, { backgroundColor: '#F3F4F6' }]}>
+                      <ThemedText style={[styles.badgeText, { color: '#6B7280' }]}>문의 필요</ThemedText>
+                    </View>
+                  </View>
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>{stay.addr1}</ThemedText>
+                  {stay.tel ? (
+                    <Pressable onPress={e => { e.stopPropagation(); openPhone(stay.tel); }}>
+                      <ThemedText type="small" style={{ color: Brand.primary }}>{stay.tel}</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <ThemedText themeColor="textSecondary" style={styles.arrow}>›</ThemedText>
+              </Pressable>
+            ))}
+          </>
+        )}
       </ScrollView>
 
       {/* 카테고리 선택 모달 */}
@@ -335,6 +388,27 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   arrow: { fontSize: 22, fontWeight: '300', paddingLeft: Spacing.two },
+
+  /* TourAPI 숙소 섹션 */
+  sectionHeader: {
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.one,
+    borderTopWidth: 4,
+    borderTopColor: '#F3F4F6',
+    marginTop: Spacing.two,
+    gap: 2,
+  },
+  sectionTitle: { fontSize: 14, fontWeight: '700' },
+  tourStayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.two,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#CCC4',
+    gap: Spacing.three,
+  },
+  tourStayThumb: { width: 52, height: 52, borderRadius: 8 },
+  tourStayThumbEmpty: { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
 
   /* 카테고리 모달 */
   modalBackdrop: {
