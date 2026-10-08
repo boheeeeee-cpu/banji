@@ -33,6 +33,7 @@ type TripStore = {
   dwellMinutes: Record<string, number>;
   customPlaces: CustomPlace[];
   savedItineraries: SavedItinerary[];
+  activeItineraryId: string | null;
   addToGo: (ids: string[]) => void;
   removeFromToGo: (id: string) => void;
   addToMyDays: (ids: string[]) => void;
@@ -76,6 +77,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   const [dwellMinutes, setDwellMinutesState] = useState<Record<string, number>>({});
   const [customPlaces, setCustomPlaces] = useState<CustomPlace[]>([]);
   const [savedItineraries, setSavedItineraries] = useState<SavedItinerary[]>([]);
+  const [activeItineraryId, setActiveItineraryId] = useState<string | null>(null);
   // Synchronous counter incremented on every user-initiated state change.
   // SupabaseSyncBridge reads this in async .then() to detect if the user
   // modified state during a Supabase load, preventing the load from overwriting.
@@ -121,7 +123,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearToGo = useCallback(() => setToGoIds([]), []);
-  const clearMyDays = useCallback(() => setMyDaysIds([]), []);
+  const clearMyDays = useCallback(() => { setMyDaysIds([]); setActiveItineraryId(null); }, []);
 
   const addCustomPlace = useCallback((data: { name: string; address?: string; lat?: number; lng?: number }) => {
     const id = `custom_${Date.now()}`;
@@ -152,10 +154,12 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
     setDwellMinutesState({});
     setDepartureLocation(null);
     setDepartureTime('09:00');
+    setActiveItineraryId(null);
   }, [myDaysIds, dwellMinutes, departureLocation, departureTime]);
 
   const deleteItinerary = useCallback((id: string) => {
     setSavedItineraries(prev => prev.filter(i => i.id !== id));
+    setActiveItineraryId(prev => (prev === id ? null : prev));
   }, []);
 
   const renameItinerary = useCallback((id: string, name: string) => {
@@ -163,6 +167,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadItinerary = useCallback((itinerary: SavedItinerary) => {
+    setActiveItineraryId(itinerary.id);
     setMyDaysIds(itinerary.placeIds);
     setDwellMinutesState(itinerary.dwellMinutes);
     setDepartureLocation(itinerary.departureLocation);
@@ -198,6 +203,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
     setDwellMinutesState({});
     setDepartureLocation(null);
     setDepartureTime('09:00');
+    setActiveItineraryId(null);
   }, [myDaysIds, dwellMinutes, departureLocation, departureTime]);
 
   const loadFromSupabase = useCallback((data: {
@@ -227,6 +233,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
     setDepartureTime('09:00');
     setMyDaysRouteActive(false);
     setSavedItineraries([]);
+    setActiveItineraryId(null);
   }, []);
 
   return (
@@ -234,7 +241,7 @@ export function TripStoreProvider({ children }: { children: React.ReactNode }) {
       value={{
         toGoIds, myDaysIds, myDaysRouteActive,
         departureLocation, departureTime, dwellMinutes,
-        customPlaces, savedItineraries,
+        customPlaces, savedItineraries, activeItineraryId,
         addToGo, removeFromToGo,
         addToMyDays, removeFromMyDays,
         moveMyDayItem,

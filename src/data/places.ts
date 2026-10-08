@@ -839,6 +839,7 @@ export const RECOMMENDED_PLACES: Place[] = [
     imageEmoji: '⚓',
     imageTint: '#E8EAF6',
     photoUrl: 'http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141735021908173.jpg',
+    contentId: '2406404',
   },
   {
     id: 'geoje_거제맹종죽테마파크',

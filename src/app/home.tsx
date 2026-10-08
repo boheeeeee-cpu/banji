@@ -11,7 +11,9 @@ import { Brand } from '@/constants/brand';
 import { Spacing } from '@/constants/theme';
 import { RECOMMENDED_PLACES } from '@/data/places';
 import { RECOMMENDED_ROUTES, type RecommendedRoute } from '@/data/routes';
+import { GEOJE_LOCAL_FESTIVALS } from '@/data/geoje-festivals';
 import { fetchGeojeEvents, fetchNearbyAttractions, type FestivalItem, type TourItem } from '@/lib/tour-api';
+import { fetchVisitorStats, levelColor, levelLabel, formatVisitorCount, type VisitorStats } from '@/lib/visitor-api';
 import { useTripStore } from '@/store/trip-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,14 +33,36 @@ export default function HomeScreen() {
   const [nearbyPlaces, setNearbyPlaces] = useState<TourItem[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState(false);
+  const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
 
   const featured = FEATURED_IDS
     .map(id => RECOMMENDED_PLACES.find(p => p.id === id))
     .filter(Boolean) as typeof RECOMMENDED_PLACES;
 
   useEffect(() => {
+    fetchVisitorStats().then(setVisitorStats).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (eventCache.current) { setEvents(eventCache.current); return; }
-    fetchGeojeEvents().then(data => { eventCache.current = data; setEvents(data); }).catch(() => {});
+    fetchGeojeEvents().then(tourData => {
+      // TourAPI 결과 제목 목록으로 로컬 축제 중복 제거
+      const tourTitles = new Set(tourData.map(e => e.title));
+      const localOnly = GEOJE_LOCAL_FESTIVALS.filter(f => !tourTitles.has(f.title));
+      // eventstartdate 기준 오름차순 정렬
+      const merged = [...tourData, ...localOnly].sort((a, b) =>
+        a.eventstartdate.localeCompare(b.eventstartdate),
+      );
+      eventCache.current = merged;
+      setEvents(merged);
+    }).catch(() => {
+      // TourAPI 실패 시 로컬 데이터만 표시
+      const sorted = [...GEOJE_LOCAL_FESTIVALS].sort((a, b) =>
+        a.eventstartdate.localeCompare(b.eventstartdate),
+      );
+      eventCache.current = sorted;
+      setEvents(sorted);
+    });
   }, []);
 
   const loadNearby = () => {
@@ -71,6 +95,25 @@ export default function HomeScreen() {
           <ThemedText style={styles.greetingText}>안녕하세요 👋</ThemedText>
           <ThemedText style={styles.subText}>거제도 반려동물 여행, 반지와 함께해요</ThemedText>
         </View>
+
+        {/* 거제 야호 */}
+        {visitorStats && (
+          <View style={[styles.yahoCard, { backgroundColor: levelColor(visitorStats.level) }]}>
+            <View style={styles.yahoLeft}>
+              <ThemedText style={styles.yahoTitle}>거제 야호! 🏝</ThemedText>
+              <ThemedText style={styles.yahoLevel}>{levelLabel(visitorStats.level)}</ThemedText>
+              <ThemedText style={styles.yahoSub}>
+                외지인 일평균 {formatVisitorCount(visitorStats.recentAvg)}
+              </ThemedText>
+            </View>
+            <View style={styles.yahoRight}>
+              <ThemedText style={styles.yahoPercent}>
+                {visitorStats.ratio >= 1 ? '+' : ''}{Math.round((visitorStats.ratio - 1) * 100)}%
+              </ThemedText>
+              <ThemedText style={styles.yahoCompare}>전월 대비</ThemedText>
+            </View>
+          </View>
+        )}
 
         {/* 빠른 통계 */}
         <View style={styles.statsRow}>
@@ -141,7 +184,7 @@ export default function HomeScreen() {
                     <View style={styles.eventInfo}>
                       <ThemedText style={styles.eventName} numberOfLines={2}>{ev.title}</ThemedText>
                       <ThemedText type="small" themeColor="textSecondary">
-                        {formatDate(ev.eventstartdate)} ~ {formatDate(ev.eventenddate)}
+                        {ev.periodLabel ?? `${formatDate(ev.eventstartdate)} ~ ${formatDate(ev.eventenddate)}`}
                       </ThemedText>
                       {ended && (
                         <View style={styles.endedBadge}>
@@ -371,6 +414,21 @@ const styles = StyleSheet.create({
   },
   saveChipSaved: { borderColor: Brand.primary, backgroundColor: Brand.primary + '12' },
   saveChipText: { fontSize: 12, fontWeight: '600', color: '#888' },
+
+  yahoCard: {
+    borderRadius: 18,
+    padding: Spacing.four,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  yahoLeft: { gap: 3, flex: 1 },
+  yahoTitle: { fontSize: 18, fontWeight: '800', color: '#FFF' },
+  yahoLevel: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.9)' },
+  yahoSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  yahoRight: { alignItems: 'flex-end', gap: 2 },
+  yahoPercent: { fontSize: 28, fontWeight: '800', color: '#FFF' },
+  yahoCompare: { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%' },

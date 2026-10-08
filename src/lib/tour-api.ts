@@ -112,6 +112,7 @@ export async function fetchNearbyAttractions(
 export type FestivalItem = TourItem & {
   eventstartdate: string;
   eventenddate: string;
+  periodLabel?: string; // 로컬 축제용 사람이 읽기 좋은 기간 표시
 };
 
 // 거제 행사/축제 목록 (올해 전체)

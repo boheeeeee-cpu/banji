@@ -1,0 +1,200 @@
+[
+  {
+    "name": "내도",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172983776828051.jpg",
+    "address": "경상남도 거제시 일운면 와현리",
+    "lat": 34.7863518,
+    "lng": 128.713877,
+    "area": "일운",
+    "petFriendly": true
+  },
+  {
+    "name": "모노레일",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172983773724446.jpg",
+    "address": "경상남도 거제시 계룡로 61 포로수용소유적공원",
+    "lat": 34.8760546,
+    "lng": 128.6251776,
+    "area": "거제",
+    "petFriendly": false
+  },
+  {
+    "name": "정글돔",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172983768432094.jpg",
+    "address": "경상남도 거제시 거제면 거제남서로 3595 거제식물원",
+    "lat": 34.8577042,
+    "lng": 128.5787083,
+    "area": "거제",
+    "petFriendly": false
+  },
+  {
+    "name": "파노라마 케이블카",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172983754713438.jpg",
+    "address": "경상남도 거제시 동부면 거제중앙로 288 거제케이블카",
+    "lat": 34.784304,
+    "lng": 128.632987,
+    "area": "동부",
+    "petFriendly": false
+  },
+  {
+    "name": "포로수용소 유적공원",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283463031628.jpg",
+    "address": "경상남도 거제시 계룡로 61 거제포로수용소유적공원",
+    "lat": 34.8755061,
+    "lng": 128.6247123,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "외도",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283455281216.jpg",
+    "address": "경상남도 거제시 일운면 지세포로 129",
+    "lat": 34.8313044,
+    "lng": 128.7016768,
+    "area": "일운",
+    "petFriendly": true
+  },
+  {
+    "name": "학동흑진주몽돌해변",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283436044318.jpg",
+    "address": "경상남도 거제시 동부면 학동리",
+    "lat": 34.7737215,
+    "lng": 128.6406089,
+    "area": "동부",
+    "petFriendly": true
+  },
+  {
+    "name": "여차홍포 해안비경",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283425203628.jpg",
+    "address": "경상남도 거제시 남부면",
+    "lat": 34.7088473,
+    "lng": 128.618705,
+    "area": "남부",
+    "petFriendly": true
+  },
+  {
+    "name": "해금강",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283391433859.jpg",
+    "address": "경상남도 거제시 남부면 갈곶리 산1 거제 해금강(갈곶도, 갈도)",
+    "lat": 34.7329181,
+    "lng": 128.68387,
+    "area": "남부",
+    "petFriendly": true
+  },
+  {
+    "name": "바람의 언덕",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/172283367871893.jpg",
+    "address": "경상남도 거제시 남부면 갈곶리 산14-47",
+    "lat": 34.7432915,
+    "lng": 128.663327,
+    "area": "남부",
+    "petFriendly": true
+  },
+  {
+    "name": "사곡해수욕장",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/153023808099642.jpg",
+    "address": "경상남도 거제시 사등면 사곡리 757-1",
+    "lat": 34.8987886,
+    "lng": 128.5730502,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "구조라유람선",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/142718668173646.jpg",
+    "address": "경상남도 거제시 일운면 구조라로 37",
+    "lat": 34.8051525,
+    "lng": 128.6952586,
+    "area": "일운",
+    "petFriendly": false
+  },
+  {
+    "name": "거제씨월드",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/144533268576901.jpg",
+    "address": "경상남도 거제시 일운면 지세포해안로 15",
+    "lat": 34.8357922,
+    "lng": 128.7013645,
+    "area": "일운",
+    "petFriendly": false
+  },
+  {
+    "name": "칠천량해전공원",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141735021908173.jpg",
+    "address": "경상남도 거제시 하청면 칠천로 265-39",
+    "lat": 34.9776616,
+    "lng": 128.6282474,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "거제맹종죽테마파크",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141696675446577.jpg",
+    "address": "경상남도 거제시 하청면 거제북로 700",
+    "lat": 34.967917,
+    "lng": 128.6505937,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "능포 양지암 조각공원",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141881790105348.jpg",
+    "address": "경상남도 거제시 능포로 194",
+    "lat": 34.8803758,
+    "lng": 128.7381372,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "약수암",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141342440279116990886.jpg",
+    "address": "경상남도 거제시 마전1길 89-13",
+    "lat": 34.8525845,
+    "lng": 128.7263924,
+    "area": "거제",
+    "petFriendly": false
+  },
+  {
+    "name": "공곶이",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141734621507185.jpg",
+    "address": "경상남도 거제시 일운면 와현리 87",
+    "lat": 34.7948684,
+    "lng": 128.7142866,
+    "area": "일운",
+    "petFriendly": true
+  },
+  {
+    "name": "덕원",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141342427316416961974.jpg",
+    "address": "경상남도 거제시 동부면 가배리",
+    "lat": 34.7786089,
+    "lng": 128.5749109,
+    "area": "동부",
+    "petFriendly": true
+  },
+  {
+    "name": "노을이 물드는 언덕",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141756939861170.jpg",
+    "address": "경상남도 거제시 사등면 창호리 1459-1",
+    "lat": 34.9547158,
+    "lng": 128.5191903,
+    "area": "거제",
+    "petFriendly": true
+  },
+  {
+    "name": "거제칠천도크루즈유람선",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141751480371445.jpg",
+    "address": "경상남도 거제시 하청면 어온4길 24",
+    "lat": 34.9807331,
+    "lng": 128.6466605,
+    "area": "거제",
+    "petFriendly": false
+  },
+  {
+    "name": "거가대교",
+    "photoUrl": "http://www.geoje.go.kr/upload_data/board_data/ATTRACTION/thumbnail/141757246802320.jpg",
+    "address": "경상남도 거제시 장목면 거제북로 2859",
+    "lat": 34.9921961,
+    "lng": 128.6877881,
+    "area": "거제",
+    "petFriendly": false
+  }
+]

@@ -2,5 +2,11 @@
   "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "alias": ["banji-banbo.vercel.app"],
+  "functions": {
+    "api/vets.js": { "maxDuration": 30 },
+    "api/trails.js": { "maxDuration": 15 },
+    "api/visitor-stats.js": { "maxDuration": 30 }
+  }
 }

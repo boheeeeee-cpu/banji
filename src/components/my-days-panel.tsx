@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as Location from 'expo-location';
+import { useNavPreference } from '@/hooks/use-nav-preference';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Modal, useColorScheme } from 'react-native';
 import { useAuthStore } from '@/store/auth-store';
 import { supabase } from '@/lib/supabase';
@@ -39,54 +41,112 @@ function addMinutes(timeStr: string, minutes: number): string {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-type NavUrls = { nmapUrl: string; webUrl: string };
+type NavUrls = {
+  naverAppUrl: string; naverWebUrl: string;
+  kakaoAppUrl: string; kakaoWebUrl: string;
+};
 
 function buildNavUrls(
-  points: { lat: number; lng: number; name: string }[],
+  start: { lat: number; lng: number; name: string },
+  dest: { lat: number; lng: number; name: string },
 ): NavUrls | null {
-  if (points.length < 2) return null;
-  const start = points[0];
-  const dest = points[points.length - 1];
-  const via = points.slice(1, -1).slice(0, 5);
+  if (!start.lat || !start.lng || !dest.lat || !dest.lng) return null;
 
-  // nmap 딥링크 (네이티브 앱 + 모바일 브라우저에서 앱 열기)
+  // 네이버지도
   const p = new URLSearchParams();
   p.set('slat', String(start.lat));
   p.set('slng', String(start.lng));
-  p.set('sname', start.name);
-  via.forEach((v, i) => {
-    p.set(`v${i + 1}lat`, String(v.lat));
-    p.set(`v${i + 1}lng`, String(v.lng));
-    p.set(`v${i + 1}name`, v.name);
-  });
+  if (start.name) p.set('sname', start.name);
   p.set('dlat', String(dest.lat));
   p.set('dlng', String(dest.lng));
-  p.set('dname', dest.name);
+  if (dest.name) p.set('dname', dest.name);
   p.set('appname', 'com.banji.app');
-  const nmapUrl = `nmap://route/car?${p.toString()}`;
+  const naverAppUrl = `nmap://route/car?${p.toString()}`;
+  const nseg = (pt: { lng: number; lat: number; name: string }) =>
+    `${pt.lng},${pt.lat},${encodeURIComponent(pt.name || '')}`;
+  const naverWebUrl = `https://map.naver.com/p/directions/${nseg(start)}/${nseg(dest)}/car/summary`;
 
-  // 웹 URL (데스크탑 브라우저 폴백)
-  const seg = (pt: { lng: number; lat: number; name: string }) =>
-    `${pt.lng},${pt.lat},${encodeURIComponent(pt.name)}`;
-  const viaSeg = via.map(seg).join('/');
-  const middle = viaSeg ? `${viaSeg}/` : '';
-  const webUrl = `https://map.naver.com/p/directions/${seg(start)}/${middle}${seg(dest)}/car/summary`;
+  // 카카오맵
+  const kakaoAppUrl = `kakaomap://route?sp=${start.lat},${start.lng}&ep=${dest.lat},${dest.lng}&by=CAR`;
+  const kseg = (pt: { lat: number; lng: number; name: string }) =>
+    `${encodeURIComponent(pt.name || '출발지')},${pt.lat},${pt.lng}`;
+  const kakaoWebUrl = `https://map.kakao.com/link/from/${kseg(start)}/to/${kseg(dest)}`;
 
-  return { nmapUrl, webUrl };
+  return { naverAppUrl, naverWebUrl, kakaoAppUrl, kakaoWebUrl };
 }
 
-function openNavigation(urls: NavUrls) {
+function openNaver(urls: NavUrls) {
   if (Platform.OS !== 'web') {
-    Linking.openURL(urls.nmapUrl);
+    Linking.openURL(urls.naverAppUrl);
     return;
   }
-  // 모바일 브라우저: nmap 딥링크로 앱 직접 열기 (자동차 모드 보장)
   const isMobile = typeof navigator !== 'undefined'
     && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   if (isMobile) {
-    window.location.href = urls.nmapUrl;
+    window.location.href = urls.naverWebUrl;
   } else {
-    window.open(urls.webUrl, '_blank');
+    window.open(urls.naverWebUrl, '_blank');
+  }
+}
+
+function openKakao(urls: NavUrls) {
+  if (Platform.OS !== 'web') {
+    Linking.openURL(urls.kakaoAppUrl);
+    return;
+  }
+  const isMobile = typeof navigator !== 'undefined'
+    && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = urls.kakaoWebUrl;
+  } else {
+    window.open(urls.kakaoWebUrl, '_blank');
+  }
+}
+
+type LocError = 'denied' | 'unavailable' | 'timeout' | 'unsupported';
+
+const LOC_ERROR_TEXT: Record<LocError, { label: string; hint: string }> = {
+  denied: {
+    label: '위치 권한 필요',
+    hint: Platform.OS === 'web'
+      ? '주소창 왼쪽 아이콘 → 위치 → 허용으로 바꾼 뒤 눌러 주세요.'
+      : '설정에서 이 앱의 위치 접근을 허용한 뒤 눌러 주세요.',
+  },
+  unavailable: {
+    label: '위치를 못 찾았어요',
+    hint: '기기 설정에서 위치 서비스(맥: 시스템 설정 → 개인정보 보호 및 보안 → 위치 서비스 → 브라우저)를 켠 뒤 눌러 주세요.',
+  },
+  timeout: { label: '다시 시도', hint: '위치를 잡는 데 시간이 오래 걸렸어요.' },
+  unsupported: { label: '위치 사용 불가', hint: '이 브라우저는 위치 기능을 지원하지 않아요.' },
+};
+
+function webPosition(timeout: number): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      err => reject(err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable'),
+      { timeout, maximumAge: 300000 },
+    );
+  });
+}
+
+async function getCurrentCoords(): Promise<{ lat: number; lng: number }> {
+  if (Platform.OS === 'web') {
+    if (!navigator.geolocation) throw 'unsupported';
+    try {
+      return await webPosition(15000);
+    } catch (e) {
+      if (e !== 'timeout') throw e;
+      return webPosition(20000);
+    }
+  }
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  if (status !== 'granted') throw 'denied';
+  try {
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch {
+    throw 'unavailable';
   }
 }
 
@@ -106,12 +166,13 @@ export default function MyDaysPanel() {
 
   const [legDurations, setLegDurations] = useState<(number | null)[]>([]);
   const [locLoading, setLocLoading] = useState(false);
-  const [locFailed, setLocFailed] = useState(false);
+  const [locError, setLocError] = useState<LocError | null>(null);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [itineraryName, setItineraryName] = useState('');
   const [saving, setSaving] = useState(false);
   const [mapModalVisible, setMapModalVisible] = useState(false);
   const [detailPlace, setDetailPlace] = useState<Place | null>(null);
+  const { navApp } = useNavPreference();
 
   const mapPlaces: MapPlacePayload[] = useMemo(
     () => RECOMMENDED_PLACES.map(p => ({ id: p.id, name: p.name, lat: p.lat, lng: p.lng, area: p.area })),
@@ -171,25 +232,39 @@ export default function MyDaysPanel() {
     return legIdx >= 0 ? (legDurations[legIdx] ?? null) : null;
   };
 
-  const requestLocation = () => {
-    if (!navigator.geolocation) { setLocFailed(true); return; }
+  const userClearedLoc = useRef(false);
+  const didInitLoc = useRef(false);
+
+  const requestLocation = async () => {
+    userClearedLoc.current = false;
     setLocLoading(true);
-    setLocFailed(false);
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        setDepartureLocation({ label: '현재 위치', lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocLoading(false);
-      },
-      () => { setLocLoading(false); setLocFailed(true); },
-      { timeout: 8000 },
-    );
+    setLocError(null);
+    try {
+      const { lat, lng } = await getCurrentCoords();
+      setDepartureLocation({ label: '현재 위치', lat, lng });
+    } catch (e) {
+      setLocError(typeof e === 'string' ? (e as LocError) : 'unavailable');
+    } finally {
+      setLocLoading(false);
+    }
   };
 
-  // 패널 열리면 자동으로 현재 위치 설정
+  const clearLocation = () => {
+    userClearedLoc.current = true;
+    setDepartureLocation(null);
+  };
+
+  // 저장된 일정의 옛 출발지 대신 열 때마다 현재 위치로 갱신하고,
+  // 이후 동기화가 출발지를 비우면 다시 채운다 (사용자가 직접 지운 경우 제외)
   useEffect(() => {
-    if (!departureLocation) requestLocation();
+    if (!didInitLoc.current) {
+      didInitLoc.current = true;
+      requestLocation();
+      return;
+    }
+    if (!departureLocation && !userClearedLoc.current && !locLoading && !locError) requestLocation();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [departureLocation]);
 
   const adjustDwell = (id: string, delta: number) => {
     const cur = dwellMinutes[id] ?? DEFAULT_DWELL;
@@ -244,7 +319,7 @@ export default function MyDaysPanel() {
             {departureLocation ? (
               <View style={styles.locRow}>
                 <ThemedText type="small" numberOfLines={1} style={styles.locText}>{departureLocation.label}</ThemedText>
-                <Pressable onPress={() => setDepartureLocation(null)} hitSlop={8}>
+                <Pressable onPress={clearLocation} hitSlop={8}>
                   <ThemedText type="small" themeColor="textSecondary"> ✕</ThemedText>
                 </Pressable>
               </View>
@@ -252,13 +327,18 @@ export default function MyDaysPanel() {
               <ThemedText type="small" themeColor="textSecondary">위치 확인 중...</ThemedText>
             ) : (
               <Pressable onPress={requestLocation} hitSlop={8}>
-                <ThemedText type="small" style={{ color: locFailed ? '#FF6B6B' : Brand.primary, fontWeight: '600' }}>
-                  {locFailed ? '위치 재시도' : '현재 위치 확인'}
+                <ThemedText type="small" style={{ color: locError ? '#FF6B6B' : Brand.primary, fontWeight: '600' }}>
+                  {locError ? LOC_ERROR_TEXT[locError].label : '현재 위치 확인'}
                 </ThemedText>
               </Pressable>
             )}
           </View>
         </View>
+        {!departureLocation && !locLoading && locError && (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.locHint}>
+            {LOC_ERROR_TEXT[locError].hint}
+          </ThemedText>
+        )}
         <View style={[styles.departureRow, styles.departureRowBorder]}>
           <ThemedText style={styles.departureLabel}>🕘 출발 시간</ThemedText>
           <View style={styles.departureRight}>
@@ -415,7 +495,7 @@ export default function MyDaysPanel() {
               <View style={styles.navSegmentContainer}>
                 {pts.slice(0, -1).map((from, i) => {
                   const to = pts[i + 1];
-                  const urls = buildNavUrls([from, to]);
+                  const urls = buildNavUrls(from, to);
                   // with departure: pts[0]=현재위치, pts[1]=1번, pts[2]=2번...
                   // without: pts[0]=1번, pts[1]=2번...
                   const fromLabel = departureLocation && i === 0 ? '현재위치' : `${departureLocation ? i : i + 1}번`;
@@ -423,12 +503,21 @@ export default function MyDaysPanel() {
                   return (
                     <Pressable
                       key={i}
-                      style={[styles.navSegmentBtn, { backgroundColor: '#03C75A' }]}
+                      style={[
+                        styles.navSegmentBtn,
+                        { backgroundColor: navApp === 'kakao' ? '#FAE100' : '#03C75A' },
+                      ]}
                       onPress={() => {
                         if (!urls) return;
-                        openNavigation(urls);
+                        if (navApp === 'kakao') openKakao(urls);
+                        else openNaver(urls);
                       }}>
-                      <ThemedText style={styles.navSegmentBtnText} numberOfLines={1}>
+                      <ThemedText
+                        style={[
+                          styles.navSegmentBtnText,
+                          navApp === 'kakao' && { color: '#3A1D1D' },
+                        ]}
+                        numberOfLines={1}>
                         🧭 {fromLabel} → {toLabel} · {from.name} → {to.name}
                       </ThemedText>
                     </Pressable>
@@ -480,6 +569,7 @@ const styles = StyleSheet.create({
   departureLabel: { fontSize: 13, fontWeight: '600', width: 90 },
   departureRight: { flex: 1, alignItems: 'flex-end' },
   locRow: { flexDirection: 'row', alignItems: 'center' },
+  locHint: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two, fontSize: 12 },
   locText: { maxWidth: 160, fontWeight: '600', color: Brand.primary },
   timeInput: { fontSize: 14, fontWeight: '600', color: Brand.primary, minWidth: 60, textAlign: 'right' },
   list: { paddingHorizontal: Spacing.four, paddingTop: Spacing.one },

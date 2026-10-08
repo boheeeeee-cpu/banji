@@ -10,6 +10,7 @@ import { BottomTabInset, Spacing } from '@/constants/theme';
 import { PLACE_TYPES, PLACE_TYPE_LABELS, RECOMMENDED_PLACES, type Place, type PlaceType } from '@/data/places';
 import { fetchGeojeStays, type TourItem } from '@/lib/tour-api';
 import { fetchGeojePetPharmacies, type VetPharmacy } from '@/lib/vet-pharmacy-api';
+import { fetchGeojeTrails, type TrailItem } from '@/lib/trails-api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTripStore } from '@/store/trip-store';
 
@@ -17,12 +18,13 @@ type ListItem =
   | { kind: 'place'; data: Place }
   | { kind: 'pharmacy'; data: VetPharmacy };
 
-type CategoryFilter = PlaceType | 'pharmacy' | 'all';
+type CategoryFilter = PlaceType | 'pharmacy' | 'trail' | 'all';
 
 const CATEGORY_OPTIONS: { id: CategoryFilter; label: string }[] = [
   { id: 'all', label: '전체' },
   ...PLACE_TYPES,
   { id: 'pharmacy', label: '동물약국' },
+  { id: 'trail', label: '산책로' },
 ];
 
 export default function ListScreen() {
@@ -34,8 +36,11 @@ export default function ListScreen() {
   const [pharmacies, setPharmacies] = useState<VetPharmacy[]>([]);
   const [addedPharmacyNames, setAddedPharmacyNames] = useState<Set<string>>(new Set());
   const [tourStays, setTourStays] = useState<TourItem[]>([]);
+  const [trails, setTrails] = useState<TrailItem[]>([]);
+  const [selectedTrail, setSelectedTrail] = useState<TrailItem | null>(null);
   const pharmacyCache = useRef<VetPharmacy[] | null>(null);
   const stayCache = useRef<TourItem[] | null>(null);
+  const trailCache = useRef<TrailItem[] | null>(null);
   const { toGoIds, myDaysIds, addCustomPlace, addToMyDays } = useTripStore();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -52,6 +57,14 @@ export default function ListScreen() {
     if (stayCache.current) { setTourStays(stayCache.current); return; }
     fetchGeojeStays()
       .then(data => { stayCache.current = data; setTourStays(data); })
+      .catch(() => {});
+  }, [category]);
+
+  useEffect(() => {
+    if (category !== 'trail') return;
+    if (trailCache.current) { setTrails(trailCache.current); return; }
+    fetchGeojeTrails()
+      .then(data => { trailCache.current = data; setTrails(data); })
       .catch(() => {});
   }, [category]);
 
@@ -97,6 +110,8 @@ export default function ListScreen() {
 
   const totalCount = category === 'all'
     ? RECOMMENDED_PLACES.length + pharmacies.length
+    : category === 'trail'
+    ? trails.length
     : filtered.length;
 
   return (
@@ -145,6 +160,50 @@ export default function ListScreen() {
           { paddingBottom: insets.bottom + BottomTabInset + Spacing.four },
         ]}
         keyboardDismissMode="on-drag">
+        {category === 'trail' ? (
+          trails.length === 0 ? (
+            <View style={styles.noResults}>
+              <ThemedText type="small" themeColor="textSecondary">산책로 정보를 불러오는 중...</ThemedText>
+            </View>
+          ) : (
+            <>
+              <View style={styles.sectionHeader}>
+                <ThemedText style={styles.sectionTitle}>거제 남파랑길</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">부산~해남 남해안 도보 여행길 거제 구간</ThemedText>
+              </View>
+              {trails.map(trail => {
+                const hours = Math.floor(trail.durationMin / 60);
+                const mins = trail.durationMin % 60;
+                const durationStr = mins > 0 ? `${hours}시간 ${mins}분` : `${hours}시간`;
+                const levelLabel = trail.level === 1 ? '쉬움' : trail.level === 2 ? '보통' : '어려움';
+                const levelColor = trail.level === 1 ? '#10B981' : trail.level === 2 ? '#F59E0B' : '#EF4444';
+                return (
+                  <Pressable
+                    key={trail.id}
+                    onPress={() => setSelectedTrail(trail)}
+                    style={({ pressed }) => [styles.trailRow, pressed && styles.pressed]}>
+                    <View style={styles.trailEmoji}>
+                      <ThemedText style={{ fontSize: 24 }}>🥾</ThemedText>
+                    </View>
+                    <View style={styles.info}>
+                      <View style={styles.nameRow}>
+                        <ThemedText style={styles.name} numberOfLines={1}>{trail.name}</ThemedText>
+                        <View style={[styles.badge, { backgroundColor: levelColor + '22' }]}>
+                          <ThemedText style={[styles.badgeText, { color: levelColor }]}>{levelLabel}</ThemedText>
+                        </View>
+                      </View>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {trail.distance}km · {durationStr}
+                      </ThemedText>
+                    </View>
+                    <ThemedText themeColor="textSecondary" style={styles.arrow}>›</ThemedText>
+                  </Pressable>
+                );
+              })}
+            </>
+          )
+        ) : (
+          <>
         {filtered.length === 0 && (category === 'stay' ? tourStays.length === 0 : true) && (
           <View style={styles.noResults}>
             <ThemedText type="small" themeColor="textSecondary">검색 결과 없음</ThemedText>
@@ -199,8 +258,10 @@ export default function ListScreen() {
             );
           }
         })}
+          </>
+        )}
         {/* TourAPI 숙소 섹션 (숙소 필터 또는 전체) */}
-        {(category === 'stay' || category === 'all') && tourStays.length > 0 && (
+        {category !== 'trail' && (category === 'stay' || category === 'all') && tourStays.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>거제 관광공사 등록 숙소</ThemedText>
@@ -322,6 +383,41 @@ export default function ListScreen() {
         )}
       </Modal>
 
+      {/* 산책로 상세 모달 */}
+      <Modal
+        visible={!!selectedTrail}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedTrail(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedTrail(null)} />
+        {selectedTrail && (() => {
+          const hours = Math.floor(selectedTrail.durationMin / 60);
+          const mins = selectedTrail.durationMin % 60;
+          const durationStr = mins > 0 ? `${hours}시간 ${mins}분` : `${hours}시간`;
+          const levelLabel = selectedTrail.level === 1 ? '쉬움' : selectedTrail.level === 2 ? '보통' : '어려움';
+          const levelColor = selectedTrail.level === 1 ? '#10B981' : selectedTrail.level === 2 ? '#F59E0B' : '#EF4444';
+          return (
+            <View style={[styles.pharmacySheet, { backgroundColor: theme.background }]}>
+              <View style={[styles.handleBar, { backgroundColor: theme.textSecondary + '44' }]} />
+              <ThemedText style={styles.pharmacySheetName}>{selectedTrail.name}</ThemedText>
+              <View style={styles.trailMetaRow}>
+                <View style={[styles.badge, { backgroundColor: levelColor + '22' }]}>
+                  <ThemedText style={[styles.badgeText, { color: levelColor }]}>{levelLabel}</ThemedText>
+                </View>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {selectedTrail.distance}km · {durationStr}
+                </ThemedText>
+              </View>
+              <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+                <ThemedText type="small" themeColor="textSecondary" style={{ lineHeight: 20 }}>
+                  {selectedTrail.summary}
+                </ThemedText>
+              </ScrollView>
+            </View>
+          );
+        })()}
+      </Modal>
+
       <PlaceDetailSheet
         place={detailPlace}
         visible={!!detailPlace}
@@ -409,6 +505,29 @@ const styles = StyleSheet.create({
   },
   tourStayThumb: { width: 52, height: 52, borderRadius: 8 },
   tourStayThumbEmpty: { backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+
+  /* 산책로 */
+  trailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#CCC4',
+    gap: Spacing.three,
+  },
+  trailEmoji: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trailMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
 
   /* 카테고리 모달 */
   modalBackdrop: {

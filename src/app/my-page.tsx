@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, View } from 'react-native';
+import { useNavPreference } from '@/hooks/use-nav-preference';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 
@@ -27,12 +28,13 @@ export default function MyPage() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { user, signOut } = useAuthStore();
-  const { toGoIds, myDaysIds, savedItineraries, deleteItinerary, renameItinerary, loadItinerary } = useTripStore();
+  const { toGoIds, myDaysIds, savedItineraries, activeItineraryId, deleteItinerary, renameItinerary, loadItinerary } = useTripStore();
   const params = useLocalSearchParams<{ section?: string }>();
   const [activeView, setActiveView] = useState<ActiveView | null>(
     (params.section as ActiveView) ?? null
   );
   const [pet, setPet] = useState<PetProfile>({ name: '', age_years: '' });
+  const { navApp, setNavApp } = useNavPreference();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
@@ -81,7 +83,6 @@ export default function MyPage() {
     }
 
     if (activeView === 'mydays-list') {
-      const hasActive = myDaysIds.length > 0;
       return (
         <ThemedView style={styles.screen}>
           <View style={[styles.header, { paddingTop: insets.top + Spacing.three }]}>
@@ -91,27 +92,11 @@ export default function MyPage() {
             <ThemedText style={styles.headerTitle}>내 일정 목록</ThemedText>
           </View>
           <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]} showsVerticalScrollIndicator={false}>
-            {/* 통합 일정 목록: 작업 중 + 저장된 일정 구분 없이 순서대로 */}
-            {hasActive && (
-              <Pressable
-                style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}
-                onPress={() => setActiveView('mydays')}>
-                <View style={[styles.itineraryBadge, { backgroundColor: Brand.primary }]}>
-                  <ThemedText style={styles.itineraryBadgeText}>●</ThemedText>
-                </View>
-                <View style={styles.itineraryInfo}>
-                  <ThemedText style={styles.itineraryName}>미저장 일정</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">{myDaysIds.length}곳</ThemedText>
-                </View>
-                <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
-              </Pressable>
-            )}
-
             {savedItineraries.map((item, idx) => (
               <View key={item.id} style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}>
                 <View style={[styles.itineraryBadge, { backgroundColor: colors.backgroundSelected }]}>
                   <ThemedText style={[styles.itineraryBadgeText, { color: colors.text }]}>
-                    {hasActive ? idx + 2 : idx + 1}
+                    {idx + 1}
                   </ThemedText>
                 </View>
                 <Pressable
@@ -125,18 +110,13 @@ export default function MyPage() {
                     {item.placeIds.length}곳 · {new Date(item.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
                   </ThemedText>
                 </Pressable>
-                <Pressable
-                  onPress={() => { setRenamingId(item.id); setRenameText(item.name); }}
-                  hitSlop={8} style={styles.actionBtn}>
-                  <ThemedText type="small" themeColor="textSecondary">✏️</ThemedText>
-                </Pressable>
                 <Pressable onPress={() => deleteItinerary(item.id)} hitSlop={8} style={styles.actionBtn}>
                   <ThemedText type="small" themeColor="textSecondary">✕</ThemedText>
                 </Pressable>
               </View>
             ))}
 
-            {!hasActive && savedItineraries.length === 0 && (
+            {savedItineraries.length === 0 && (
               <View style={styles.emptyState}>
                 <ThemedText style={styles.emptyEmoji}>🗓</ThemedText>
                 <ThemedText type="smallBold">저장된 일정이 없어요</ThemedText>
@@ -144,40 +124,13 @@ export default function MyPage() {
               </View>
             )}
           </ScrollView>
-
-          <Modal visible={renamingId !== null} transparent animationType="fade">
-            <Pressable style={styles.modalOverlay} onPress={() => setRenamingId(null)}>
-              <Pressable style={[styles.modalBox, { backgroundColor: colors.background }]} onPress={() => {}}>
-                <ThemedText style={styles.modalTitle}>일정 이름 수정</ThemedText>
-                <TextInput
-                  style={[styles.modalInput, { backgroundColor: colors.backgroundElement, color: colors.text }]}
-                  value={renameText}
-                  onChangeText={setRenameText}
-                  autoFocus
-                  selectTextOnFocus
-                />
-                <View style={styles.modalButtons}>
-                  <Pressable style={styles.modalCancelBtn} onPress={() => setRenamingId(null)}>
-                    <ThemedText themeColor="textSecondary">취소</ThemedText>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.modalConfirmBtn, !renameText.trim() && { opacity: 0.4 }]}
-                    disabled={!renameText.trim()}
-                    onPress={() => {
-                      if (renamingId && renameText.trim()) {
-                        renameItinerary(renamingId, renameText.trim());
-                        setRenamingId(null);
-                      }
-                    }}>
-                    <ThemedText style={styles.modalConfirmText}>저장</ThemedText>
-                  </Pressable>
-                </View>
-              </Pressable>
-            </Pressable>
-          </Modal>
         </ThemedView>
       );
     }
+
+    const activeItinerary = activeView === 'mydays'
+      ? savedItineraries.find(i => i.id === activeItineraryId)
+      : undefined;
 
     return (
       <ThemedView style={styles.screen}>
@@ -187,11 +140,52 @@ export default function MyPage() {
               {activeView === 'mydays' ? '← 목록' : '← 마이'}
             </ThemedText>
           </Pressable>
-          <ThemedText style={styles.headerTitle}>
-            {activeView === 'togo' ? '찜 목록' : '내 일정'}
-          </ThemedText>
+          {activeItinerary ? (
+            <Pressable
+              style={styles.titleEdit}
+              hitSlop={8}
+              onPress={() => { setRenamingId(activeItinerary.id); setRenameText(activeItinerary.name); }}>
+              <ThemedText style={styles.headerTitle} numberOfLines={1}>{activeItinerary.name}</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">✏️</ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText style={styles.headerTitle}>
+              {activeView === 'togo' ? '찜 목록' : '내 일정'}
+            </ThemedText>
+          )}
         </View>
         {activeView === 'togo' ? <ToGoPanel /> : <MyDaysPanel />}
+
+        <Modal visible={renamingId !== null} transparent animationType="fade">
+          <Pressable style={styles.modalOverlay} onPress={() => setRenamingId(null)}>
+            <Pressable style={[styles.modalBox, { backgroundColor: colors.background }]} onPress={() => {}}>
+              <ThemedText style={styles.modalTitle}>일정 이름 수정</ThemedText>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: colors.backgroundElement, color: colors.text }]}
+                value={renameText}
+                onChangeText={setRenameText}
+                autoFocus
+                selectTextOnFocus
+              />
+              <View style={styles.modalButtons}>
+                <Pressable style={styles.modalCancelBtn} onPress={() => setRenamingId(null)}>
+                  <ThemedText themeColor="textSecondary">취소</ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalConfirmBtn, !renameText.trim() && { opacity: 0.4 }]}
+                  disabled={!renameText.trim()}
+                  onPress={() => {
+                    if (renamingId && renameText.trim()) {
+                      renameItinerary(renamingId, renameText.trim());
+                      setRenamingId(null);
+                    }
+                  }}>
+                  <ThemedText style={styles.modalConfirmText}>저장</ThemedText>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </ThemedView>
     );
   }
@@ -255,6 +249,29 @@ export default function MyPage() {
 
           <View style={[styles.divider, { backgroundColor: colors.backgroundSelected }]} />
 
+          <View style={styles.menuRow}>
+            <ThemedText style={styles.menuIcon}>🧭</ThemedText>
+            <ThemedText style={styles.menuLabel}>길찾기 앱</ThemedText>
+            <View style={[styles.navToggle, { backgroundColor: colors.backgroundSelected }]}>
+              <Pressable
+                style={[styles.navToggleBtn, navApp === 'naver' && { backgroundColor: '#03C75A' }]}
+                onPress={() => setNavApp('naver')}>
+                <ThemedText style={[styles.navToggleBtnText, navApp === 'naver' && { color: '#fff' }]}>
+                  네이버
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[styles.navToggleBtn, navApp === 'kakao' && { backgroundColor: '#FAE100' }]}
+                onPress={() => setNavApp('kakao')}>
+                <ThemedText style={[styles.navToggleBtnText, navApp === 'kakao' && { color: '#3A1D1D' }]}>
+                  카카오
+                </ThemedText>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: colors.backgroundSelected }]} />
+
           <Pressable
             style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}
             onPress={() => setActiveView('mydays-list')}>
@@ -293,7 +310,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.two,
   },
   title: { fontSize: 22, fontWeight: '800' },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: '700', flexShrink: 1 },
+  titleEdit: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   backText: { fontSize: 15, color: Brand.primary, fontWeight: '600' },
 
   profileCard: {
@@ -335,6 +353,21 @@ const styles = StyleSheet.create({
   menuIcon: { fontSize: 20, width: 28 },
   menuLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
   chevron: { fontSize: 20 },
+  navToggle: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  navToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  navToggleBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   divider: { height: 1, marginLeft: Spacing.three + 28 + Spacing.two },
 
   signOutBtn: {
