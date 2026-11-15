@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/brand';
 import { BottomTabInset, Spacing } from '@/constants/theme';
+import { ISLAND_TRAILS } from '@/data/island-trails';
 import { SEASON_CARDS, SEASON_LABELS, seasonOf } from '@/data/seasons';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchNowFestivals, formatPeriod, type NowFestival } from '@/lib/festivals';
@@ -179,11 +180,34 @@ export default function NowScreen() {
         {/* 섬앤섬길 */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>🏝️ 거제섬앤섬길</ThemedText>
-          <View style={[styles.notice, { backgroundColor: theme.backgroundElement }]}>
-            <ThemedText type="small" themeColor="textSecondary">
-              거제시가 만든 걷기 길로, 1코스 칠천량해전길부터 14코스 대금산진달래길까지 이어져요. 코스별 거리와 반려견 동반 정보는 정리하는 중이에요.
+          <ThemedText type="small" themeColor="textSecondary">
+            거제 곳곳을 잇는 걷기 길이에요. 확인된 코스부터 보여 드려요.
+          </ThemedText>
+          <View style={[styles.notice, { backgroundColor: '#FEF3C7' }]}>
+            <ThemedText type="small" style={{ color: '#92400E' }}>
+              ⚠️ 산길이 많고 반려견 동반 여부는 확인되지 않았어요. 아이 체력과 길 상태를 꼭 확인하고 걸어 주세요.
             </ThemedText>
           </View>
+          {ISLAND_TRAILS.map(t => (
+            <Pressable
+              key={t.id}
+              onPress={() => Linking.openURL(t.sourceUrl)}
+              style={({ pressed }) => [styles.festivalRow, { borderColor: theme.backgroundElement }, pressed && styles.pressed]}>
+              <View style={styles.festivalTop}>
+                <ThemedText type="smallBold" style={styles.flex}>{t.name}</ThemedText>
+                <ThemedText themeColor="textSecondary" style={styles.arrow}>›</ThemedText>
+              </View>
+              <ThemedText type="small" themeColor="textSecondary">
+                {t.distanceKm}km · {t.duration}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={2}>
+                {t.stops.join(' → ')}
+              </ThemedText>
+            </Pressable>
+          ))}
+          <ThemedText type="small" themeColor="textSecondary" style={styles.source}>
+            자료: 거제랑 (누르면 원문 페이지가 열려요)
+          </ThemedText>
         </View>
       </ScrollView>
 
