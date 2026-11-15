@@ -14,8 +14,7 @@ import { Colors, Spacing } from '@/constants/theme';
 
 const TAB_ITEMS = [
   { name: 'home',     href: '/home',     icon: '🏠',  label: '홈'      },
-  { name: 'list',     href: '/list',     icon: '📍',  label: '목록'    },
-  { name: 'search',   href: '/search',   icon: '🔍',  label: '검색'    },
+  { name: 'list',     href: '/list',     icon: '🔍',  label: '찾기'    },
   { name: 'my-page',  href: '/my-page',  icon: '👤',  label: '마이'    },
 ] as const;
 

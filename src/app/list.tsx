@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { WebSearchResults } from '@/components/find/web-search-results';
 import { PlaceDetailSheet } from '@/components/place-detail-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,7 +33,8 @@ export default function ListScreen() {
   const [selectedPharmacy, setSelectedPharmacy] = useState<VetPharmacy | null>(null);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
-  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  // 네이버 검색은 입력이 멈추고 0.7초 뒤(또는 검색 키)에만 호출
+  const [webQuery, setWebQuery] = useState('');
   const [pharmacies, setPharmacies] = useState<VetPharmacy[]>([]);
   const [addedPharmacyNames, setAddedPharmacyNames] = useState<Set<string>>(new Set());
   const [tourStays, setTourStays] = useState<TourItem[]>([]);
@@ -68,6 +70,13 @@ export default function ListScreen() {
       .catch(() => {});
   }, [category]);
 
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setWebQuery(''); return; }
+    const t = setTimeout(() => setWebQuery(q), 700);
+    return () => clearTimeout(t);
+  }, [query]);
+
   const allItems = useMemo<ListItem[]>(() => {
     const places: ListItem[] = RECOMMENDED_PLACES.map(p => ({ kind: 'place', data: p }));
     const pharms: ListItem[] = pharmacies.map(p => ({ kind: 'pharmacy', data: p }));
@@ -95,7 +104,18 @@ export default function ListScreen() {
     });
   }, [allItems, query, category]);
 
-  const selectedCategoryLabel = CATEGORY_OPTIONS.find(c => c.id === category)?.label ?? '전체';
+  const searching = query.trim().length > 0;
+
+  const visibleStays = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return tourStays;
+    return tourStays.filter(s => s.title.toLowerCase().includes(q) || s.addr1?.toLowerCase().includes(q));
+  }, [tourStays, query]);
+
+  const shownNames = useMemo(
+    () => [...filtered.map(i => i.data.name), ...visibleStays.map(s => s.title)],
+    [filtered, visibleStays],
+  );
 
   const handleAddPharmacy = (p: VetPharmacy) => {
     const id = addCustomPlace({ name: p.name, address: p.address, lat: p.lat, lng: p.lng });
@@ -117,22 +137,23 @@ export default function ListScreen() {
   return (
     <ThemedView style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.three }]}>
-        <ThemedText style={styles.title}>업체 목록</ThemedText>
+        <ThemedText style={styles.title}>찾기</ThemedText>
         <ThemedText type="small" style={{ color: Brand.primary }}>
           {toGoIds.length > 0 ? `찜 ${toGoIds.length}곳` : `총 ${totalCount}곳`}
         </ThemedText>
       </View>
 
-      {/* 검색 + 카테고리 */}
+      {/* 검색 */}
       <View style={styles.filterRow}>
         <View style={[styles.searchBarWrap, { backgroundColor: theme.backgroundElement, flex: 1 }]}>
           <ThemedText style={styles.searchIcon}>🔍</ThemedText>
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder="장소명, 지역..."
+            placeholder="가게 이름, 지역, 메뉴 (예: 카페, 장승포)"
             placeholderTextColor={theme.textSecondary}
             value={query}
             onChangeText={setQuery}
+            onSubmitEditing={() => setWebQuery(query.trim())}
             returnKeyType="search"
             clearButtonMode="while-editing"
             autoCorrect={false}
@@ -143,16 +164,32 @@ export default function ListScreen() {
             </Pressable>
           )}
         </View>
-
-        <Pressable
-          onPress={() => setCategoryModalVisible(true)}
-          style={[styles.categoryBtn, { backgroundColor: theme.backgroundElement }]}>
-          <ThemedText style={[styles.categoryBtnText, { color: category !== 'all' ? Brand.primary : theme.textSecondary }]} numberOfLines={1}>
-            {selectedCategoryLabel}
-          </ThemedText>
-          <ThemedText style={[styles.categoryArrow, { color: theme.textSecondary }]}>▾</ThemedText>
-        </Pressable>
       </View>
+
+      {/* 카테고리 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipScroll}
+        contentContainerStyle={styles.chipRow}>
+        {CATEGORY_OPTIONS.map(opt => {
+          const selected = category === opt.id;
+          return (
+            <Pressable
+              key={opt.id}
+              onPress={() => setCategory(opt.id)}
+              style={[
+                styles.categoryChip,
+                { borderColor: selected ? Brand.primary : theme.textSecondary + '44' },
+                selected && { backgroundColor: Brand.primary },
+              ]}>
+              <ThemedText style={[styles.categoryChipText, selected && { color: '#FFF' }]}>
+                {opt.label}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <ScrollView
         contentContainerStyle={[
@@ -204,9 +241,16 @@ export default function ListScreen() {
           )
         ) : (
           <>
-        {filtered.length === 0 && (category === 'stay' ? tourStays.length === 0 : true) && (
+        {searching && (
+          <View style={styles.petSectionHeader}>
+            <ThemedText style={styles.sectionTitle}>🐶 반려동물 동반 가능 · 반지 목록</ThemedText>
+          </View>
+        )}
+        {filtered.length === 0 && (category === 'stay' ? visibleStays.length === 0 : true) && (
           <View style={styles.noResults}>
-            <ThemedText type="small" themeColor="textSecondary">검색 결과 없음</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {searching ? '반지 목록에는 없어요' : '이 분류에는 아직 장소가 없어요'}
+            </ThemedText>
           </View>
         )}
         {filtered.map((item, i) => {
@@ -261,13 +305,13 @@ export default function ListScreen() {
           </>
         )}
         {/* TourAPI 숙소 섹션 (숙소 필터 또는 전체) */}
-        {category !== 'trail' && (category === 'stay' || category === 'all') && tourStays.length > 0 && (
+        {category !== 'trail' && (category === 'stay' || category === 'all') && visibleStays.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>거제 관광공사 등록 숙소</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">반려동물 동반 전 전화 확인 권장</ThemedText>
             </View>
-            {tourStays.map(stay => (
+            {visibleStays.map(stay => (
               <Pressable
                 key={`tour-stay-${stay.contentid}`}
                 onPress={() => {
@@ -302,38 +346,19 @@ export default function ListScreen() {
             ))}
           </>
         )}
-      </ScrollView>
 
-      {/* 카테고리 선택 모달 */}
-      <Modal
-        visible={categoryModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCategoryModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setCategoryModalVisible(false)} />
-        <View style={[styles.categoryModal, { backgroundColor: theme.background }]}>
-          <ThemedText style={styles.categoryModalTitle}>카테고리</ThemedText>
-          <View style={styles.categoryGrid}>
-            {CATEGORY_OPTIONS.map(opt => {
-              const selected = category === opt.id;
-              return (
-                <Pressable
-                  key={opt.id}
-                  onPress={() => { setCategory(opt.id); setCategoryModalVisible(false); }}
-                  style={[
-                    styles.categoryChip,
-                    { borderColor: selected ? Brand.primary : theme.textSecondary + '44' },
-                    selected && { backgroundColor: Brand.primary },
-                  ]}>
-                  <ThemedText style={[styles.categoryChipText, selected && { color: '#FFF' }]}>
-                    {opt.label}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
+        {/* 반지 목록에 없는 업체 (네이버 검색) */}
+        {category !== 'trail' && searching && (
+          <WebSearchResults query={webQuery} excludeNames={shownNames} />
+        )}
+        {category !== 'trail' && searching && !webQuery && (
+          <View style={styles.noResults}>
+            <ThemedText type="small" themeColor="textSecondary">
+              두 글자 이상 입력하면 거제의 다른 업체도 찾아드려요
+            </ThemedText>
           </View>
-        </View>
-      </Modal>
+        )}
+      </ScrollView>
 
       {/* 동물약국 상세 모달 */}
       <Modal
@@ -456,17 +481,9 @@ const styles = StyleSheet.create({
   searchIcon: { fontSize: 16 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   clearBtn: { fontSize: 14, color: '#999' },
-  categoryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    gap: 4,
-    minWidth: 80,
-  },
-  categoryBtnText: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  categoryArrow: { fontSize: 10 },
+  chipScroll: { flexGrow: 0, marginBottom: Spacing.two },
+  chipRow: { paddingHorizontal: Spacing.four, gap: Spacing.two },
+  petSectionHeader: { paddingTop: Spacing.two, paddingBottom: Spacing.one, paddingHorizontal: Spacing.one },
 
   noResults: { paddingVertical: Spacing.six, alignItems: 'center' },
   list: { paddingHorizontal: Spacing.four, gap: 0 },
@@ -535,20 +552,9 @@ const styles = StyleSheet.create({
     top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
-  categoryModal: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.four,
-    paddingBottom: Spacing.six,
-    gap: Spacing.three,
-  },
-  categoryModalTitle: { fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   categoryChip: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1.5,
   },
