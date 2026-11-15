@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { PlacePhoto } from '@/components/place-photo';
 import { PopularPlacesRow } from '@/components/home/popular-places-row';
+import { PetPlacesSection } from '@/components/home/pet-places-section';
 import { Brand } from '@/constants/brand';
 import { Spacing } from '@/constants/theme';
 import { RECOMMENDED_PLACES } from '@/data/places';
@@ -18,14 +19,12 @@ import { useTripStore } from '@/store/trip-store';
 import { useAuthStore } from '@/store/auth-store';
 import { useTheme } from '@/hooks/use-theme';
 
-const FEATURED_IDS = ['4', '20', '10', '1', '15'];
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const theme = useTheme();
   const { user } = useAuthStore();
-  const { toGoIds, myDaysIds, savedItineraries, addToGo, startNewItinerary } = useTripStore();
+  const { toGoIds, myDaysIds, savedItineraries, startNewItinerary } = useTripStore();
   const totalItineraries = savedItineraries.length + (myDaysIds.length > 0 ? 1 : 0);
   const [selectedRoute, setSelectedRoute] = useState<RecommendedRoute | null>(null);
   const [events, setEvents] = useState<FestivalItem[]>([]);
@@ -34,10 +33,6 @@ export default function HomeScreen() {
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState(false);
   const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
-
-  const featured = FEATURED_IDS
-    .map(id => RECOMMENDED_PLACES.find(p => p.id === id))
-    .filter(Boolean) as typeof RECOMMENDED_PLACES;
 
   useEffect(() => {
     fetchVisitorStats().then(setVisitorStats).catch(() => {});
@@ -90,44 +85,8 @@ export default function HomeScreen() {
   return (
     <ThemedView style={styles.screen}>
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.four }]}>
-        {/* 인사 */}
-        <View style={styles.greeting}>
-          <ThemedText style={styles.greetingText}>안녕하세요 👋</ThemedText>
-          <ThemedText style={styles.subText}>거제도 반려동물 여행, 반지와 함께해요</ThemedText>
-        </View>
-
-        {/* 거제 야호 */}
-        {visitorStats && (
-          <View style={[styles.yahoCard, { backgroundColor: levelColor(visitorStats.level) }]}>
-            <View style={styles.yahoLeft}>
-              <ThemedText style={styles.yahoTitle}>거제 야호! 🏝</ThemedText>
-              <ThemedText style={styles.yahoLevel}>{levelLabel(visitorStats.level)}</ThemedText>
-              <ThemedText style={styles.yahoSub}>
-                외지인 일평균 {formatVisitorCount(visitorStats.recentAvg)}
-              </ThemedText>
-            </View>
-            <View style={styles.yahoRight}>
-              <ThemedText style={styles.yahoPercent}>
-                {visitorStats.ratio >= 1 ? '+' : ''}{Math.round((visitorStats.ratio - 1) * 100)}%
-              </ThemedText>
-              <ThemedText style={styles.yahoCompare}>전월 대비</ThemedText>
-            </View>
-          </View>
-        )}
-
-        {/* 빠른 통계 */}
-        <View style={styles.statsRow}>
-          <Pressable style={styles.statCard} onPress={() => router.navigate({ pathname: '/my-page', params: { section: 'togo' } })}>
-            <ThemedText style={styles.statEmoji}>❤️</ThemedText>
-            <ThemedText style={styles.statNum}>{toGoIds.length}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">찜한 장소</ThemedText>
-          </Pressable>
-          <Pressable style={styles.statCard} onPress={() => router.navigate({ pathname: '/my-page', params: { section: 'mydays-list' } })}>
-            <ThemedText style={styles.statEmoji}>🗓</ThemedText>
-            <ThemedText style={styles.statNum}>{totalItineraries}</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">내 일정</ThemedText>
-          </Pressable>
-        </View>
+        {/* 반려동물 동반 장소 (홈 맨 위) */}
+        <PetPlacesSection />
 
         {/* 추천 루트 */}
         <View style={styles.routeSection}>
@@ -251,29 +210,38 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* 추천 장소 */}
-        <View style={styles.featuredSection}>
-          <ThemedText style={styles.sectionTitle}>📍 반지 추천 장소</ThemedText>
-          {featured.map(place => {
-            const saved = toGoIds.includes(place.id);
-            return (
-              <View key={place.id} style={styles.placeRow}>
-                <PlacePhoto place={place} />
-                <View style={styles.placeInfo}>
-                  <ThemedText type="smallBold" numberOfLines={1}>{place.name}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">{place.area} · {place.petNote}</ThemedText>
-                </View>
-                <Pressable
-                  onPress={() => !saved && addToGo([place.id])}
-                  style={[styles.saveChip, saved && styles.saveChipSaved]}>
-                  <ThemedText style={[styles.saveChipText, saved && { color: Brand.primary }]}>
-                    {saved ? '저장됨' : '+ 저장'}
-                  </ThemedText>
-                </Pressable>
-              </View>
-            );
-          })}
+        {/* 빠른 통계 */}
+        <View style={styles.statsRow}>
+          <Pressable style={styles.statCard} onPress={() => router.navigate({ pathname: '/my-page', params: { section: 'togo' } })}>
+            <ThemedText style={styles.statEmoji}>❤️</ThemedText>
+            <ThemedText style={styles.statNum}>{toGoIds.length}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">찜한 장소</ThemedText>
+          </Pressable>
+          <Pressable style={styles.statCard} onPress={() => router.navigate({ pathname: '/my-page', params: { section: 'mydays-list' } })}>
+            <ThemedText style={styles.statEmoji}>🗓</ThemedText>
+            <ThemedText style={styles.statNum}>{totalItineraries}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">내 일정</ThemedText>
+          </Pressable>
         </View>
+
+        {/* 거제 야호 */}
+        {visitorStats && (
+          <View style={[styles.yahoCard, { backgroundColor: levelColor(visitorStats.level) }]}>
+            <View style={styles.yahoLeft}>
+              <ThemedText style={styles.yahoTitle}>거제 야호! 🏝</ThemedText>
+              <ThemedText style={styles.yahoLevel}>{levelLabel(visitorStats.level)}</ThemedText>
+              <ThemedText style={styles.yahoSub}>
+                외지인 일평균 {formatVisitorCount(visitorStats.recentAvg)}
+              </ThemedText>
+            </View>
+            <View style={styles.yahoRight}>
+              <ThemedText style={styles.yahoPercent}>
+                {visitorStats.ratio >= 1 ? '+' : ''}{Math.round((visitorStats.ratio - 1) * 100)}%
+              </ThemedText>
+              <ThemedText style={styles.yahoCompare}>전월 대비</ThemedText>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* 루트 상세 모달 */}
