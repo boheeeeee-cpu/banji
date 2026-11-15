@@ -4,6 +4,10 @@ import { useTripStore } from '@/store/trip-store';
 
 const KEY = '@banji/trip';
 
+// 기기 저장소를 다 읽은 뒤에 풀리는 약속. 로그인 시 계정 데이터와 합칠 때 이걸 기다림
+let resolveLocalReady: () => void = () => {};
+export const localStorageReady = new Promise<void>(resolve => { resolveLocalReady = resolve; });
+
 export default function LocalStorageBridge() {
   const {
     toGoIds, myDaysIds, customPlaces, dwellMinutes,
@@ -12,11 +16,11 @@ export default function LocalStorageBridge() {
   } = useTripStore();
 
   const loadedRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // 앱 시작 시 로컬 스토리지에서 불러오기
   useEffect(() => {
-    AsyncStorage.getItem(KEY).then(json => {
+    AsyncStorage.getItem(KEY).catch(() => null).then(json => {
       if (json) {
         try {
           const data = JSON.parse(json);
@@ -31,7 +35,7 @@ export default function LocalStorageBridge() {
           });
         } catch {}
       }
-      setTimeout(() => { loadedRef.current = true; }, 300);
+      setTimeout(() => { loadedRef.current = true; resolveLocalReady(); }, 300);
     });
   }, []);
 

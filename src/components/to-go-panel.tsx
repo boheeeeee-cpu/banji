@@ -69,7 +69,7 @@ export default function ToGoPanel() {
       <ThemedView style={styles.empty}>
         <ThemedText style={styles.emptyEmoji}>📍</ThemedText>
         <ThemedText type="smallBold">아직 추가된 장소가 없어요</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">목록이나 검색에서 가고 싶은 곳을 추가해 보세요</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">찾기 탭에서 가고 싶은 곳을 찜해 보세요</ThemedText>
       </ThemedView>
     );
   }

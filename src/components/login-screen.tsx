@@ -32,7 +32,8 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      // 앱(Expo Go 등)에서는 window.location이 개발 서버 주소라서, 재설정 링크는 항상 실제 웹사이트로 보냄
+      redirectTo: `${Platform.OS === 'web' ? window.location.origin : 'https://banji-banbo.vercel.app'}/reset-password`,
     });
     setLoading(false);
     if (error) setError('전송 실패. 이메일을 확인해주세요.');

@@ -15,7 +15,8 @@ import { supabase } from '@/lib/supabase';
 import { Colors, Spacing } from '@/constants/theme';
 import { Brand } from '@/constants/brand';
 
-type ActiveView = 'togo' | 'mydays' | 'mydays-list' | 'login';
+type ActiveView = 'togo' | 'mydays' | 'mydays-list' | 'login' | 'settings';
+type MainTab = 'togo' | 'itineraries';
 
 type PetProfile = {
   name: string;
@@ -27,14 +28,17 @@ export default function MyPage() {
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { user, signOut } = useAuthStore();
+  const { user } = useAuthStore();
   const { toGoIds, myDaysIds, savedItineraries, activeItineraryId, deleteItinerary, renameItinerary, loadItinerary } = useTripStore();
   const params = useLocalSearchParams<{ section?: string }>();
-  const [activeView, setActiveView] = useState<ActiveView | null>(
-    (params.section as ActiveView) ?? null
-  );
+  // 예전 링크(section=togo / mydays-list)는 메인 화면의 찜·일정 칸으로 바로 보냄
+  const sectionToView = (s?: string): ActiveView | null =>
+    s === 'mydays' || s === 'login' || s === 'settings' ? s : null;
+  const sectionToTab = (s?: string): MainTab | null =>
+    s === 'togo' ? 'togo' : s === 'mydays-list' ? 'itineraries' : null;
+  const [activeView, setActiveView] = useState<ActiveView | null>(sectionToView(params.section));
+  const [mainTab, setMainTab] = useState<MainTab>(sectionToTab(params.section) ?? 'togo');
   const [pet, setPet] = useState<PetProfile>({ name: '', age_years: '' });
-  const { navApp, setNavApp } = useNavPreference();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
 
@@ -47,7 +51,11 @@ export default function MyPage() {
   }, [navigation]);
 
   useEffect(() => {
-    if (params.section) setActiveView(params.section as ActiveView);
+    if (!params.section) return;
+    const tab = sectionToTab(params.section);
+    if (tab) { setMainTab(tab); setActiveView(null); }
+    else setActiveView(sectionToView(params.section));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.section]);
 
   useEffect(() => {
@@ -69,6 +77,10 @@ export default function MyPage() {
 
   // 서브 뷰 (찜 목록 / 내 일정 / 로그인)
   if (activeView) {
+    if (activeView === 'settings') {
+      return <SettingsView onBack={() => setActiveView(null)} />;
+    }
+
     if (activeView === 'login') {
       return (
         <ThemedView style={styles.screen}>
@@ -135,9 +147,14 @@ export default function MyPage() {
     return (
       <ThemedView style={styles.screen}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.three }]}>
-          <Pressable onPress={() => setActiveView(activeView === 'mydays' ? 'mydays-list' : null)} hitSlop={12}>
+          <Pressable
+            onPress={() => {
+              if (activeView === 'mydays') setMainTab('itineraries');
+              setActiveView(null);
+            }}
+            hitSlop={12}>
             <ThemedText style={styles.backText}>
-              {activeView === 'mydays' ? '← 목록' : '← 마이'}
+              {activeView === 'mydays' ? '← 일정' : '← 마이'}
             </ThemedText>
           </Pressable>
           {activeItinerary ? (
@@ -191,18 +208,20 @@ export default function MyPage() {
   }
 
   const displayName = user?.email?.split('@')[0] ?? '';
+  const showDraft = myDaysIds.length > 0 && !activeItineraryId;
+  const itineraryCount = savedItineraries.length + (showDraft ? 1 : 0);
 
   return (
     <ThemedView style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
-        showsVerticalScrollIndicator={false}>
-
-        <View style={[styles.header, { paddingTop: insets.top + Spacing.three }]}>
-          <ThemedText style={styles.title}>마이</ThemedText>
+      <View style={[styles.mainTop, { paddingTop: insets.top + Spacing.three }]}>
+        <View style={styles.header}>
+          <ThemedText style={[styles.title, { flex: 1 }]}>마이</ThemedText>
+          <Pressable onPress={() => setActiveView('settings')} hitSlop={10}>
+            <ThemedText style={styles.settingsIcon}>⚙️</ThemedText>
+          </Pressable>
         </View>
 
-        {/* 프로필 카드 */}
+        {/* 계정 카드: 로그인 여부에 따라 저장 위치 안내 */}
         <View style={[styles.profileCard, { backgroundColor: colors.backgroundElement }]}>
           <View style={[styles.avatar, { backgroundColor: colors.backgroundSelected }]}>
             <ThemedText style={styles.avatarEmoji}>🐾</ThemedText>
@@ -210,45 +229,115 @@ export default function MyPage() {
           {user ? (
             <View style={styles.profileInfo}>
               <ThemedText style={styles.displayName}>{displayName}</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">{user.email}</ThemedText>
               {pet.name ? (
-                <ThemedText type="small" themeColor="textSecondary" style={styles.petText}>
+                <ThemedText type="small" themeColor="textSecondary">
                   🐶 {pet.name}{pet.age_years ? ` · ${pet.age_years}살` : ''}
                 </ThemedText>
               ) : null}
+              <ThemedText type="small" themeColor="textSecondary">☁️ 계정에 저장돼요 · 다른 기기에서도 볼 수 있어요</ThemedText>
             </View>
           ) : (
             <View style={styles.profileInfo}>
-              <ThemedText style={styles.emptyName} themeColor="textSecondary">—</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">로그인하면 정보가 표시됩니다</ThemedText>
+              <ThemedText style={styles.displayName}>로그인 안 함</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">📱 찜과 일정이 이 기기에만 저장돼요</ThemedText>
             </View>
           )}
         </View>
-
-        {/* 로그인 버튼 (비로그인 시) */}
         {!user && (
           <Pressable
             style={[styles.loginBtn, { backgroundColor: Brand.primary }]}
             onPress={() => setActiveView('login')}>
-            <ThemedText style={styles.loginBtnText}>로그인 / 회원가입</ThemedText>
+            <ThemedText style={styles.loginBtnText}>로그인하고 다른 기기에서도 보기</ThemedText>
           </Pressable>
         )}
 
-        {/* 메뉴 버튼 */}
-        <View style={[styles.menuCard, { backgroundColor: colors.backgroundElement }]}>
-          <Pressable
-            style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}
-            onPress={() => setActiveView('togo')}>
-            <ThemedText style={styles.menuIcon}>❤️</ThemedText>
-            <ThemedText style={styles.menuLabel}>찜 목록</ThemedText>
-            {toGoIds.length > 0 && (
-              <ThemedText type="small" themeColor="textSecondary">{toGoIds.length}곳</ThemedText>
-            )}
-            <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
+        {/* 찜 / 일정 전환 */}
+        <View style={[styles.segment, { backgroundColor: colors.backgroundElement }]}>
+          {([
+            { id: 'togo', label: `❤️ 찜 ${toGoIds.length}` },
+            { id: 'itineraries', label: `🗓 일정 ${itineraryCount}` },
+          ] as const).map(seg => {
+            const selected = mainTab === seg.id;
+            return (
+              <Pressable
+                key={seg.id}
+                onPress={() => setMainTab(seg.id)}
+                style={[styles.segmentBtn, selected && { backgroundColor: colors.background }]}>
+                <ThemedText style={[styles.segmentText, selected && { color: Brand.primary }]}>{seg.label}</ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {mainTab === 'togo' ? (
+        <ToGoPanel />
+      ) : (
+        <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
+          {showDraft && (
+            <Pressable
+              style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}
+              onPress={() => setActiveView('mydays')}>
+              <View style={[styles.itineraryBadge, { backgroundColor: Brand.primary }]}>
+                <ThemedText style={styles.itineraryBadgeText}>✏️</ThemedText>
+              </View>
+              <View style={styles.itineraryInfo}>
+                <ThemedText style={styles.itineraryName}>지금 짜는 일정</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{myDaysIds.length}곳 · 아직 저장 전</ThemedText>
+              </View>
+              <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
+            </Pressable>
+          )}
+          {savedItineraries.map((item, idx) => (
+            <View key={item.id} style={[styles.itineraryCard, { backgroundColor: colors.backgroundElement }]}>
+              <View style={[styles.itineraryBadge, { backgroundColor: colors.backgroundSelected }]}>
+                <ThemedText style={[styles.itineraryBadgeText, { color: colors.text }]}>{idx + 1}</ThemedText>
+              </View>
+              <Pressable
+                style={styles.itineraryInfo}
+                onPress={() => { loadItinerary(item); setActiveView('mydays'); }}>
+                <ThemedText style={styles.itineraryName}>{item.name}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {item.placeIds.length}곳 · {new Date(item.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                </ThemedText>
+              </Pressable>
+              <Pressable onPress={() => deleteItinerary(item.id)} hitSlop={8} style={styles.actionBtn}>
+                <ThemedText type="small" themeColor="textSecondary">✕</ThemedText>
+              </Pressable>
+            </View>
+          ))}
+          {itineraryCount === 0 && (
+            <View style={styles.emptyState}>
+              <ThemedText style={styles.emptyEmoji}>🗓</ThemedText>
+              <ThemedText type="smallBold">아직 일정이 없어요</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">찜에서 장소를 골라 일정을 만들어 보세요</ThemedText>
+            </View>
+          )}
+        </ScrollView>
+      )}
+    </ThemedView>
+  );
+}
+
+// 설정 화면 (길찾기 앱, 로그아웃) — MyPage 안에서 activeView === 'settings'일 때 사용
+function SettingsView({ onBack }: { onBack: () => void }) {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const insets = useSafeAreaInsets();
+  const { user, signOut } = useAuthStore();
+  const { navApp, setNavApp } = useNavPreference();
+
+  return (
+    <ThemedView style={styles.screen}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}>
+        <View style={[styles.header, { paddingTop: insets.top + Spacing.three }]}>
+          <Pressable onPress={onBack} hitSlop={12}>
+            <ThemedText style={styles.backText}>← 마이</ThemedText>
           </Pressable>
+          <ThemedText style={styles.headerTitle}>설정</ThemedText>
+        </View>
 
-          <View style={[styles.divider, { backgroundColor: colors.backgroundSelected }]} />
-
+        <View style={[styles.menuCard, { backgroundColor: colors.backgroundElement }]}>
           <View style={styles.menuRow}>
             <ThemedText style={styles.menuIcon}>🧭</ThemedText>
             <ThemedText style={styles.menuLabel}>길찾기 앱</ThemedText>
@@ -269,32 +358,20 @@ export default function MyPage() {
               </Pressable>
             </View>
           </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.backgroundSelected }]} />
-
-          <Pressable
-            style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]}
-            onPress={() => setActiveView('mydays-list')}>
-            <ThemedText style={styles.menuIcon}>🗓</ThemedText>
-            <ThemedText style={styles.menuLabel}>내 일정 목록</ThemedText>
-            {(savedItineraries.length + (myDaysIds.length > 0 ? 1 : 0)) > 0 && (
-              <ThemedText type="small" themeColor="textSecondary">
-                {savedItineraries.length + (myDaysIds.length > 0 ? 1 : 0)}개
-              </ThemedText>
-            )}
-            <ThemedText style={styles.chevron} themeColor="textSecondary">›</ThemedText>
-          </Pressable>
         </View>
 
-        {/* 로그아웃 */}
         {user && (
-          <Pressable
-            style={[styles.signOutBtn, { borderColor: colors.backgroundElement }]}
-            onPress={signOut}>
-            <ThemedText style={{ color: '#EF4444', fontSize: 15 }}>로그아웃</ThemedText>
-          </Pressable>
+          <>
+            <ThemedText type="small" themeColor="textSecondary" style={{ paddingHorizontal: Spacing.one }}>
+              {user.email}로 로그인됨 · 로그아웃해도 이 기기의 찜과 일정은 남아요
+            </ThemedText>
+            <Pressable
+              style={[styles.signOutBtn, { borderColor: colors.backgroundElement }]}
+              onPress={() => { signOut(); onBack(); }}>
+              <ThemedText style={{ color: '#EF4444', fontSize: 15 }}>로그아웃</ThemedText>
+            </Pressable>
+          </>
         )}
-
       </ScrollView>
     </ThemedView>
   );
@@ -303,6 +380,11 @@ export default function MyPage() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scroll: { paddingHorizontal: Spacing.four, gap: Spacing.three },
+  mainTop: { paddingHorizontal: Spacing.four, gap: Spacing.three, paddingBottom: Spacing.three },
+  settingsIcon: { fontSize: 20 },
+  segment: { flexDirection: 'row', borderRadius: 12, padding: 4, gap: 4 },
+  segmentBtn: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
+  segmentText: { fontSize: 15, fontWeight: '700' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

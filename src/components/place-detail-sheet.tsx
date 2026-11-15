@@ -113,7 +113,7 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
     if (!hasCurrentItinerary) {
       addToMyDays([place.id]);
       handleClose();
-      router.navigate('/my-days' as any);
+      router.navigate({ pathname: '/my-page', params: { section: 'mydays' } });
     } else {
       setShowItineraryChoice(true);
     }
@@ -122,13 +122,13 @@ export function PlaceDetailSheet({ place, visible, onClose }: Props) {
   const handleAddToExisting = () => {
     addToMyDays([place.id]);
     handleClose();
-    router.navigate('/my-days' as any);
+    router.navigate({ pathname: '/my-page', params: { section: 'mydays' } });
   };
 
   const handleStartNew = () => {
     startNewItinerary([place.id]);
     handleClose();
-    router.navigate('/my-days' as any);
+    router.navigate({ pathname: '/my-page', params: { section: 'mydays' } });
   };
 
   const handleAddParking = (parking: ParkingResult) => {
