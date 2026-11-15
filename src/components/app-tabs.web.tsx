@@ -7,7 +7,7 @@ import {
   TabTriggerSlotProps,
   Tabs,
 } from 'expo-router/ui';
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native';
+import { Pressable, type PressableProps, StyleSheet, useColorScheme, View } from 'react-native';
 
 import { ThemedText } from './themed-text';
 import { Colors, Spacing } from '@/constants/theme';
@@ -43,7 +43,8 @@ function TabButton({
   ...props
 }: TabTriggerSlotProps & { icon: string; label: string }) {
   return (
-    <Pressable {...props} style={styles.tabButton}>
+    // RN 0.88 ref 타입이 TabTriggerSlotProps와 달라 타입만 맞춤 (동작은 그대로)
+    <Pressable {...(props as PressableProps)} style={styles.tabButton}>
       <View style={[styles.iconWrap, isFocused && styles.iconWrapFocused]}>
         <ThemedText style={styles.tabIcon}>{icon}</ThemedText>
       </View>

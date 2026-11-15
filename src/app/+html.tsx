@@ -1,4 +1,4 @@
-import { ScrollViewStyleReset } from 'expo-router/html';
+import { ScrollViewStyleReset, useServerDocumentContext } from 'expo-router/html';
 import { type PropsWithChildren } from 'react';
 
 import { NAVER_MAP_CLIENT_ID } from '@/constants/map';
@@ -9,9 +9,11 @@ import { NAVER_MAP_CLIENT_ID } from '@/constants/map';
  */
 export default function Root({ children }: PropsWithChildren) {
   const naverScriptSrc = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAP_CLIENT_ID}&callback=onBanjiNaverMapsReady`;
+  // SDK 58: 루트 HTML은 headNodes·bodyNodes를 직접 렌더링해야 앱이 hydrate됨
+  const { htmlAttributes, bodyAttributes, headNodes, bodyNodes } = useServerDocumentContext();
 
   return (
-    <html lang="ko">
+    <html lang="ko" {...htmlAttributes}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -58,8 +60,12 @@ export default function Root({ children }: PropsWithChildren) {
         />
         <script type="text/javascript" src="/banji-map-bridge.js?v=2" />
         <script type="text/javascript" src={naverScriptSrc} />
+        {headNodes}
       </head>
-      <body>{children}</body>
+      <body {...bodyAttributes}>
+        {children}
+        {bodyNodes}
+      </body>
     </html>
   );
 }
