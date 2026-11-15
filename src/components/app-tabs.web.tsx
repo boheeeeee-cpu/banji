@@ -15,7 +15,8 @@ import { Colors, Spacing } from '@/constants/theme';
 const TAB_ITEMS = [
   { name: 'home',     href: '/home',     icon: '🏠',  label: '홈'      },
   { name: 'list',     href: '/list',     icon: '🔍',  label: '찾기'    },
-  { name: 'my-page',  href: '/my-page',  icon: '👤',  label: '마이'    },
+  { name: 'now',      href: '/now',      icon: '🌊',  label: '지금 거제' },
+  { name: 'my-page', href: '/my-page',  icon: '👤',  label: '마이'    },
 ] as const;
 
 export default function AppTabs() {

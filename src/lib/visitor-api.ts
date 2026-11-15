@@ -1,4 +1,6 @@
-export type VisitorLevel = 'high' | 'normal' | 'low';
+import { apiOrigin } from '@/lib/api-base';
+
+export type VisitorLevel ='high' | 'normal' | 'low';
 
 export type VisitorStats = {
   recentAvg: number;
@@ -11,8 +13,7 @@ export type VisitorStats = {
 };
 
 export async function fetchVisitorStats(): Promise<VisitorStats> {
-  const base = typeof window !== 'undefined' ? window.location.origin : '';
-  const res = await fetch(`${base}/api/visitor-stats`);
+  const res = await fetch(`${apiOrigin()}/api/visitor-stats`);
   if (!res.ok) throw new Error(`visitor-stats API ${res.status}`);
   return res.json();
 }

@@ -1,3 +1,5 @@
+import { apiOrigin } from '@/lib/api-base';
+
 export type VetItem = {
   name: string;
   address: string;
@@ -6,8 +8,7 @@ export type VetItem = {
 };
 
 export async function fetchGeojeVets(): Promise<VetItem[]> {
-  const base = typeof window !== 'undefined' ? window.location.origin : '';
-  const res = await fetch(`${base}/api/vets`);
+  const res = await fetch(`${apiOrigin()}/api/vets`);
   if (!res.ok) throw new Error(`vets API ${res.status}`);
   return res.json();
 }
